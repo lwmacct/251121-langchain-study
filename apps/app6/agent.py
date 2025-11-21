@@ -11,7 +11,7 @@ from langchain_core.tools import BaseTool
 from langchain_openai import ChatOpenAI
 from rich.console import Console
 
-from .config import config
+from config import config
 
 console = Console()
 
@@ -80,23 +80,55 @@ class Agent:
             try:
                 response = self.llm_with_tools.invoke(messages)
 
-                # 检查是否需要调用工具
-                if not response.tool_calls:
+                # 合并 valid 和 invalid tool calls
+                # invalid_tool_calls 通常是因为参数为 None（无参数工具）
+                all_tool_calls = []
+
+                # 添加有效的工具调用
+                if response.tool_calls:
+                    all_tool_calls.extend(response.tool_calls)
+
+                # 处理 invalid_tool_calls - 修复无参数工具的问题
+                if hasattr(response, "invalid_tool_calls") and response.invalid_tool_calls:
+                    for invalid_tc in response.invalid_tool_calls:
+                        # 如果错误是因为 args 为 None，将其转换为空字典
+                        if invalid_tc.get("args") is None:
+                            fixed_tc = {
+                                "name": invalid_tc["name"],
+                                "args": {},  # 空参数
+                                "id": invalid_tc["id"],
+                                "type": invalid_tc.get("type", "function"),
+                            }
+                            all_tool_calls.append(fixed_tc)
+                            if config.debug:
+                                console.print(f"[dim yellow]⚠️  修复无参数工具调用: {invalid_tc['name']}[/dim yellow]")
+                        else:
+                            # 其他类型的 invalid_tool_calls 记录警告
+                            if config.debug:
+                                console.print(f"[yellow]警告: 跳过无效工具调用: {invalid_tc}[/yellow]")
+
+                # 检查是否有工具调用
+                if not all_tool_calls:
                     # 没有工具调用，直接返回 LLM 的回复
                     return response.content, tool_calls_made if tool_calls_made else None
 
                 # 处理工具调用
-                messages.append(response)  # 添加 LLM 的工具调用消息
+                # 创建一个清理过的 AIMessage，只包含有效的 tool_calls
+                # 避免将 invalid_tool_calls 传递给后续的 API 调用
+                clean_response = AIMessage(
+                    content=response.content,
+                    tool_calls=all_tool_calls,
+                    id=response.id,
+                )
+                messages.append(clean_response)
 
-                for tool_call in response.tool_calls:
+                for tool_call in all_tool_calls:
                     tool_name = tool_call["name"]
                     tool_args = tool_call["args"]
                     tool_id = tool_call["id"]
 
                     if config.debug:
-                        console.print(
-                            f"[dim cyan]→ 工具调用: {tool_name}({tool_args})[/dim cyan]"
-                        )
+                        console.print(f"[dim cyan]→ 工具调用: {tool_name}({tool_args})[/dim cyan]")
 
                     # 执行工具
                     if tool_name in self.tools_map:
@@ -148,6 +180,6 @@ class Agent:
 
 def create_agent() -> Agent:
     """工厂函数：创建配置好的 Agent 实例"""
-    from .tools import calculate, get_current_time, get_conversation_stats
+    from tools import calculate, get_current_time, get_conversation_stats
 
     return Agent(tools=[get_current_time, calculate, get_conversation_stats])

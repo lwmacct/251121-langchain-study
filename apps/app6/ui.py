@@ -75,6 +75,9 @@ def get_input_iterator(interactive_after_pipe: bool = False) -> Iterator[tuple[s
             line.strip() for line in sys.stdin.read().splitlines() if line.strip()
         ]
         for line in piped_lines:
+            # 跳过退出命令（管道模式下不需要）
+            if line.lower() in ["quit", "exit", "退出", "结束", "q"]:
+                continue
             yield line, True  # 来自管道，需要打印
 
         if not interactive_after_pipe:
@@ -83,27 +86,29 @@ def get_input_iterator(interactive_after_pipe: bool = False) -> Iterator[tuple[s
         print_system("管道输入处理完毕，进入交互模式（Ctrl+D 或 Ctrl+C 退出）\n")
 
     # 2. 交互式模式 - 简化版本
-    print_system("交互模式 (输入 'quit' 或 'exit' 退出，Ctrl+C 中断)\n")
+    console.print("[dim]───────────────────────────────────────[/dim]")
+    console.print("[dim]提示: 输入消息后按 Enter 发送[/dim]")
+    console.print("[dim]      Ctrl+C 或输入 'quit' 退出[/dim]")
+    console.print("[dim]───────────────────────────────────────[/dim]\n")
 
     while True:
         try:
             # 使用 Rich 的输入
-            console.print("[dim]─" * 40 + "[/dim]")
-            user_input = console.input("[bold cyan]你: [/bold cyan]")
+            user_input = console.input("[bold cyan]>>> [/bold cyan]")
 
             user_input = user_input.strip()
             if not user_input:
                 continue
 
             # 检查退出命令
-            if user_input.lower() in ["quit", "exit", "退出", "结束"]:
-                print_system("再见！")
+            if user_input.lower() in ["quit", "exit", "退出", "结束", "q"]:
+                console.print("\n[dim]👋 再见！[/dim]")
                 break
 
             yield user_input, False  # 来自交互，不需要打印
 
         except (EOFError, KeyboardInterrupt):
-            print_system("\n再见！")
+            console.print("\n[dim]👋 再见！[/dim]")
             break
 
 
@@ -160,6 +165,9 @@ def get_advanced_input_iterator(
             line.strip() for line in sys.stdin.read().splitlines() if line.strip()
         ]
         for line in piped_lines:
+            # 跳过退出命令（管道模式下不需要）
+            if line.lower() in ["quit", "exit", "退出", "结束", "q"]:
+                continue
             yield line, True
 
         if not interactive_after_pipe:
@@ -169,7 +177,7 @@ def get_advanced_input_iterator(
 
     # 2. 交互式模式 - 复用 app5 的高级实现
     last_ctrl_c_time = 0
-    hint_text = [" Ctrl+J 换行 | Enter 发送 | 连按两次 Ctrl+C 退出"]
+    hint_text = [""]  # 默认为空，避免干扰对话显示
     result_text = [None]
     should_exit = [False]
     history = InMemoryHistory()
@@ -207,13 +215,13 @@ def get_advanced_input_iterator(
                 event.app.exit()
             else:
                 last_ctrl_c_time = current_time
-                hint_text[0] = " ^C (再按一次退出)"
+                hint_text[0] = "⚠️ 再按一次 Ctrl+C 退出"
                 event.current_buffer.reset()
                 event.app.invalidate()
 
                 def reset_hint():
-                    if hint_text[0] == " ^C (再按一次退出)":
-                        hint_text[0] = " Ctrl+J 换行 | Enter 发送 | 连按两次 Ctrl+C 退出"
+                    if hint_text[0] == "⚠️ 再按一次 Ctrl+C 退出":
+                        hint_text[0] = ""
                         event.app.invalidate()
 
                 event.app.loop.call_later(1.0, reset_hint)
@@ -276,7 +284,7 @@ def get_advanced_input_iterator(
 
             if result_text[0]:
                 user_input = result_text[0].strip()
-                hint_text[0] = " Ctrl+J 换行 | Enter 发送 | 连按两次 Ctrl+C 退出"
+                hint_text[0] = ""
                 if user_input:
                     yield user_input, False
         except EOFError:

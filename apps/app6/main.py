@@ -18,38 +18,24 @@
 """
 
 import argparse
+import os
 import sys
 
-# 支持直接运行和模块运行两种方式
-if __name__ == "__main__" and __package__ is None:
-    import os
+# 添加当前目录到 sys.path，支持同目录导入
+sys.path.insert(0, os.path.dirname(__file__))
 
-    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-    from apps.app6.agent import create_agent
-    from apps.app6.session import Session
-    from apps.app6.ui import (
-        print_user,
-        print_assistant,
-        print_system,
-        print_error,
-        get_input_iterator,
-        get_advanced_input_iterator,
-        ADVANCED_UI_AVAILABLE,
-    )
-    from apps.app6.config import config
-else:
-    from .agent import create_agent
-    from .session import Session
-    from .ui import (
-        print_user,
-        print_assistant,
-        print_system,
-        print_error,
-        get_input_iterator,
-        get_advanced_input_iterator,
-        ADVANCED_UI_AVAILABLE,
-    )
-    from .config import config
+from agent import create_agent
+from session import Session
+from ui import (
+    print_user,
+    print_assistant,
+    print_system,
+    print_error,
+    get_input_iterator,
+    get_advanced_input_iterator,
+    ADVANCED_UI_AVAILABLE,
+)
+from config import config
 
 
 def parse_args():
