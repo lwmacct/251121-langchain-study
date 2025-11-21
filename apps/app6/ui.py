@@ -1,29 +1,31 @@
-"""App6 异步用户界面模块 - 基于 app5 界面 + 异步能力
+"""App6 异步用户界面模块 - 底部固定输入区 + 上方滚动输出
 
 设计理念：
-- 保持 app5 的 Application 界面（分割线、行号、提示栏）
-- 增加异步能力：输入后立即可输入下一条，不等待 LLM
-- 输出时机：获取下一次输入前，批量显示已完成的响应
-- 避免 Application 运行时输出导致界面错乱
+- **上方区域**：Rich print 正常输出，终端自然滚动（历史消息）
+- **底部固定区域**：prompt_toolkit 输入框，固定占用底部几行
+- 后台任务完成时直接 print，输出会向上滚动
+- 输入框始终固定在底部可见
 
-界面外观（与 app5 相同）：
+界面外观：
+  用户: 你好                          ← 终端滚动区域
+  助手: [LLM:chat] 你好！...          ← 使用 Rich print
+  用户: 现在几点                      ← 正常向上滚动
+  助手: [get_current_time] 23:00
   ─────────────────────────────────
-  1> 第一行文本
-  2> 第二行文本
+  1> 输入内容...                      ← 固定在底部
   ─────────────────────────────────
-  Ctrl+J 换行 | Enter 发送 | 连按两次 Ctrl+C 退出
+  ⏳ 2 个处理中 | Ctrl+J 换行 | Enter 发送
 
-关键改进：
-- 使用 run_async() 支持异步
-- 后台响应暂存，在下次输入前显示
-- 状态栏显示待处理任务数
+关键技术：
+- 输出在两次输入之间进行（Application 不运行时）
+- 输出完成后重新启动 Application
+- 实现"输出向上滚动，输入框固定底部"的效果
 """
 
 import asyncio
 import sys
 import time
 import shutil
-from typing import List, Tuple
 
 from rich.console import Console
 from rich.text import Text
@@ -60,28 +62,6 @@ class AsyncChatUI:
         self.pending_count = 0  # 等待中的 LLM 请求数
         self.should_exit = False
         self.last_ctrl_c_time = 0
-        self.pending_outputs: List[Tuple[str, str, str]] = []  # (type, content, tool_name)
-
-    def set_waiting(self, waiting: bool):
-        """设置等待状态（保留兼容性）"""
-        pass
-
-    def update_pending(self, delta: int):
-        """更新等待中的请求数"""
-        self.pending_count = max(0, self.pending_count + delta)
-
-    def add_pending_output(self, output_type: str, content: str, tool_name: str = None):
-        """添加待显示的输出"""
-        self.pending_outputs.append((output_type, content, tool_name))
-
-    def flush_pending_outputs(self):
-        """显示所有待输出的消息"""
-        for output_type, content, tool_name in self.pending_outputs:
-            if output_type == "user":
-                print_user(content)
-            elif output_type == "assistant":
-                print_assistant(content, tool_name)
-        self.pending_outputs.clear()
 
     @staticmethod
     def _get_width():
@@ -101,9 +81,6 @@ class AsyncChatUI:
 
     async def get_input_async(self) -> str | None:
         """异步获取用户输入 - 使用 app5 的 Application 布局"""
-        # 先显示所有待输出的消息
-        self.flush_pending_outputs()
-
         result_text = [None]
         buffer = Buffer(
             history=self.history,

@@ -1,36 +1,40 @@
 """
-App6: 异步聊天应用，基于 app5 界面 + 异步能力
+App6: 异步聊天应用，底部固定输入区 + 上方滚动输出
 
 特性：
 - ✨ 等待 LLM 响应时可立即输入下一条消息
-- 🎨 使用 app5 的界面效果（分割线、行号、提示栏）
-- 🚀 异步处理多个请求，响应在下次输入前批量显示
-- 📊 实时显示待处理任务数量（"⏳ N 个处理中"）
+- 📜 上方使用标准终端输出（Rich print），自然滚动
+- 📝 底部固定输入框（prompt_toolkit Application）
+- ⚡ 后台任务完成后在下次输入前显示（避免视觉冲突）
+- 📊 实时显示待处理任务数量
 
-界面设计（与 app5 相同）：
-  ─────────────────────────────────────
-  1> 第一行文本
-  2> 第二行文本
-  ─────────────────────────────────────
-  ⏳ 2 个处理中 | Ctrl+J 换行 | Enter 发送 | 连按两次 Ctrl+C 退出
+界面设计：
+  用户: 你好                          ↑ 终端滚动区域
+  助手: [LLM:chat] 你好！...          ↑ Rich print 输出
+  用户: 现在几点                      ↑ 自然向上滚动
+  助手: [get_current_time] 23:00      ↑
+  ─────────────────────────────────  ← 分割线
+  1> 输入内容...                      ← 固定在底部
+  ─────────────────────────────────  ← 分割线
+  ⏳ 2 个处理中 | Ctrl+J 换行 | Enter 发送
 
 工作流程：
-  1. 用户输入消息，按 Enter 提交
-  2. 立即显示用户消息，启动后台 LLM 任务
-  3. 立即返回输入界面，可以继续输入下一条
-  4. 后台任务完成时，响应暂存到 pending_outputs
-  5. 下次获取输入前，自动显示所有已完成的响应
+  1. 循环开始：显示所有已完成任务的输出（Rich print）
+  2. 启动 Application 获取输入（固定在底部）
+  3. 用户输入完成，Application 退出
+  4. 显示用户消息，启动后台任务
+  5. 回到步骤 1（后台任务在运行，但不阻塞输入循环）
 
 技术要点：
-- 使用 Application.run_async() 支持异步
-- 输出暂存机制避免 Application 运行时输出导致界面错乱
-- 完美结合 app5 界面效果和 app6 异步能力
+- 输出总是在 Application 不运行时进行
+- Application 仅用于获取输入，固定在底部
+- 输出使用 Rich print，自然向上滚动
+- 完美实现"上方滚动 + 底部固定"的效果
 """
 
 import argparse
 import asyncio
 import sys
-from collections import deque
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
@@ -57,78 +61,6 @@ def parse_args():
     return parser.parse_args()
 
 
-class AsyncChatSession:
-    """异步聊天会话管理器"""
-
-    def __init__(self, llm: ChatOpenAI, ui: AsyncChatUI):
-        self.llm = llm
-        self.ui = ui
-        self.history: list = []
-        self.pending_tasks: deque = deque()  # 按顺序存储待处理任务
-        self.should_exit = False
-
-    async def process_input(self, user_input: str, from_pipe: bool = False):
-        """处理用户输入"""
-        if from_pipe:
-            print_user(user_input)
-
-        self.history.append(HumanMessage(content=user_input))
-
-        # 创建处理任务
-        task = asyncio.create_task(self._handle_response(user_input))
-        self.pending_tasks.append(task)
-        self.ui.update_pending(1)
-
-    async def _handle_response(self, user_input: str):
-        """处理单个响应"""
-        try:
-            action = await route_intent_async(self.llm, user_input, self.history)
-
-            if action == "time":
-                result = get_current_time.invoke({})
-                reply = f"当前时间：{result}"
-                self.history.append(AIMessage(content=reply))
-                print_assistant(reply, tool_name="get_current_time")
-
-            elif action == "end":
-                result = end_chat.invoke({"reason": user_input})
-                self.history.append(AIMessage(content=result))
-                print_assistant(result, tool_name="end_chat")
-                self.should_exit = True
-
-            elif action == "summary":
-                sys_msg = SystemMessage(content="用 2-3 句话简洁总结这段对话的主要内容。")
-                human_msg = HumanMessage(content=f"对话内容：\n{render_history(self.history)}")
-                try:
-                    resp = await self.llm.ainvoke([sys_msg, human_msg])
-                    reply = resp.content
-                except Exception as exc:
-                    reply = f"总结失败：{exc}"
-                self.history.append(AIMessage(content=reply))
-                print_assistant(reply, tool_name="LLM:summary")
-
-            else:  # chat
-                sys_msg = SystemMessage(
-                    content="你是一个有帮助的中文助手。根据对话上下文回答用户问题。如果用户问时间段（如上午/下午），请基于之前获取的时间信息回答。"
-                )
-                try:
-                    resp = await self.llm.ainvoke([sys_msg] + self.history)
-                    reply = resp.content
-                except Exception as exc:
-                    reply = f"回答失败：{exc}"
-                self.history.append(AIMessage(content=reply))
-                print_assistant(reply, tool_name="LLM:chat")
-
-        finally:
-            self.ui.update_pending(-1)
-
-    async def wait_all_pending(self):
-        """等待所有待处理任务完成"""
-        while self.pending_tasks:
-            task = self.pending_tasks.popleft()
-            await task
-
-
 async def async_main():
     """异步主函数"""
     args = parse_args()
@@ -150,95 +82,145 @@ async def async_main():
     if is_piped:
         piped_lines = [line.strip() for line in sys.stdin.read().splitlines() if line.strip()]
 
-        # 管道模式：使用简单输出
-        ui = AsyncChatUI()
-        session = AsyncChatSession(llm, ui)
-
+        # 管道模式：同步处理每条消息
         for line in piped_lines:
-            await session.process_input(line, from_pipe=True)
-            await session.wait_all_pending()
-            if session.should_exit:
+            print_user(line)
+            history.append(HumanMessage(content=line))
+
+            action = await route_intent_async(llm, line, history)
+
+            if action == "time":
+                result = get_current_time.invoke({})
+                reply = f"当前时间：{result}"
+                history.append(AIMessage(content=reply))
+                print_assistant(reply, tool_name="get_current_time")
+
+            elif action == "end":
+                result = end_chat.invoke({"reason": line})
+                history.append(AIMessage(content=result))
+                print_assistant(result, tool_name="end_chat")
                 return
 
-        # 保留管道模式的历史
-        history = session.history
+            elif action == "summary":
+                sys_msg = SystemMessage(content="用 2-3 句话简洁总结这段对话的主要内容。")
+                human_msg = HumanMessage(content=f"对话内容：\n{render_history(history)}")
+                try:
+                    resp = await llm.ainvoke([sys_msg, human_msg])
+                    reply = resp.content
+                except Exception as exc:
+                    reply = f"总结失败：{exc}"
+                history.append(AIMessage(content=reply))
+                print_assistant(reply, tool_name="LLM:summary")
+
+            else:  # chat
+                sys_msg = SystemMessage(
+                    content="你是一个有帮助的中文助手。根据对话上下文回答用户问题。如果用户问时间段（如上午/下午），请基于之前获取的时间信息回答。"
+                )
+                try:
+                    resp = await llm.ainvoke([sys_msg] + history)
+                    reply = resp.content
+                except Exception as exc:
+                    reply = f"回答失败：{exc}"
+                history.append(AIMessage(content=reply))
+                print_assistant(reply, tool_name="LLM:chat")
 
         if not args.interactive:
             return
 
-        # 进入交互模式
-        from rich.console import Console
-        Console().print("\n[dim]─── 进入交互模式 ───[/dim]\n")
-
-    # 交互模式：使用 app5 界面 + 异步处理
+    # 交互模式：底部固定输入区 + 上方滚动输出
     ui = AsyncChatUI()
-    pending_tasks = []
+    pending_tasks = {}
+    task_counter = 0
+    pending_outputs = []  # 待输出的消息队列
+    should_exit = False
 
-    while True:
-        # 获取输入（会先显示所有待输出的响应）
+    async def process_message(msg: str):
+        """后台处理消息，完成时添加到输出队列"""
+        try:
+            action = await route_intent_async(llm, msg, history)
+
+            if action == "time":
+                result = get_current_time.invoke({})
+                reply = f"当前时间：{result}"
+                history.append(AIMessage(content=reply))
+                pending_outputs.append(("assistant", reply, "get_current_time"))
+
+            elif action == "end":
+                result = end_chat.invoke({"reason": msg})
+                history.append(AIMessage(content=result))
+                pending_outputs.append(("assistant", result, "end_chat"))
+                nonlocal should_exit
+                should_exit = True
+
+            elif action == "summary":
+                sys_msg = SystemMessage(content="用 2-3 句话简洁总结这段对话的主要内容。")
+                human_msg = HumanMessage(content=f"对话内容：\n{render_history(history)}")
+                try:
+                    resp = await llm.ainvoke([sys_msg, human_msg])
+                    reply = resp.content
+                except Exception as exc:
+                    reply = f"总结失败：{exc}"
+                history.append(AIMessage(content=reply))
+                pending_outputs.append(("assistant", reply, "LLM:summary"))
+
+            else:  # chat
+                sys_msg = SystemMessage(
+                    content="你是一个有帮助的中文助手。根据对话上下文回答用户问题。"
+                )
+                try:
+                    resp = await llm.ainvoke([sys_msg] + history)
+                    reply = resp.content
+                except Exception as exc:
+                    reply = f"回答失败：{exc}"
+                history.append(AIMessage(content=reply))
+                pending_outputs.append(("assistant", reply, "LLM:chat"))
+
+        except Exception as e:
+            pending_outputs.append(("assistant", f"错误: {e}", "Error"))
+
+    while not should_exit:
+        # 1. 等待并显示所有已完成的任务输出
+        done_ids = [tid for tid, task in pending_tasks.items() if task.done()]
+        for tid in done_ids:
+            task = pending_tasks.pop(tid)
+            try:
+                await task
+            except Exception:
+                pass
+
+        # 2. 显示所有待输出的消息（在 Application 运行前）
+        while pending_outputs:
+            output_type, content, tool_name = pending_outputs.pop(0)
+            if output_type == "assistant":
+                print_assistant(content, tool_name)
+
+        # 3. 更新待处理计数
+        ui.pending_count = len(pending_tasks)
+
+        # 4. 获取用户输入（Application 运行）
         user_input = await ui.get_input_async()
         if user_input is None:
             break
 
-        # 显示用户消息
-        ui.add_pending_output("user", user_input)
-        ui.flush_pending_outputs()
-
+        # 5. 显示用户消息（Application 退出后）
+        print_user(user_input)
         history.append(HumanMessage(content=user_input))
 
-        # 后台处理（不等待）- 使用 default 参数捕获当前输入
-        async def process(msg=user_input):
-            try:
-                action = await route_intent_async(llm, msg, history)
+        # 6. 启动后台任务
+        task_counter += 1
+        task = asyncio.create_task(process_message(user_input))
+        pending_tasks[task_counter] = task
 
-                if action == "time":
-                    result = get_current_time.invoke({})
-                    reply = f"当前时间：{result}"
-                    history.append(AIMessage(content=reply))
-                    ui.add_pending_output("assistant", reply, tool_name="get_current_time")
+    # 等待所有任务完成
+    for task in list(pending_tasks.values()):
+        if not task.done():
+            await task
 
-                elif action == "end":
-                    result = end_chat.invoke({"reason": user_input})
-                    history.append(AIMessage(content=result))
-                    ui.add_pending_output("assistant", result, tool_name="end_chat")
-                    ui.should_exit = True
-
-                elif action == "summary":
-                    sys_msg = SystemMessage(content="用 2-3 句话简洁总结这段对话的主要内容。")
-                    human_msg = HumanMessage(content=f"对话内容：\n{render_history(history)}")
-                    try:
-                        resp = await llm.ainvoke([sys_msg, human_msg])
-                        reply = resp.content
-                    except Exception as exc:
-                        reply = f"总结失败：{exc}"
-                    history.append(AIMessage(content=reply))
-                    ui.add_pending_output("assistant", reply, tool_name="LLM:summary")
-
-                else:  # chat
-                    sys_msg = SystemMessage(
-                        content="你是一个有帮助的中文助手。根据对话上下文回答用户问题。"
-                    )
-                    try:
-                        resp = await llm.ainvoke([sys_msg] + history)
-                        reply = resp.content
-                    except Exception as exc:
-                        reply = f"回答失败：{exc}"
-                    history.append(AIMessage(content=reply))
-                    ui.add_pending_output("assistant", reply, tool_name="LLM:chat")
-
-            finally:
-                ui.update_pending(-1)
-
-        # 启动后台任务
-        task = asyncio.create_task(process())
-        pending_tasks.append(task)
-        ui.update_pending(1)
-
-        # 如果用户要退出，等待所有任务完成
-        if ui.should_exit:
-            for task in pending_tasks:
-                await task
-            break
+    # 显示剩余输出
+    while pending_outputs:
+        output_type, content, tool_name = pending_outputs.pop(0)
+        if output_type == "assistant":
+            print_assistant(content, tool_name)
 
 
 def main():
