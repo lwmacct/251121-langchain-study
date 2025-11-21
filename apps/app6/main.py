@@ -1,10 +1,30 @@
 """
-App6: 异步聊天应用，支持并发输入编辑
+App6: 异步聊天应用，基于 app5 界面 + 异步能力
 
 特性：
-- 等待 LLM 响应时可继续编辑输入
-- 异步处理多个请求
-- 响应按发送顺序显示
+- ✨ 等待 LLM 响应时可立即输入下一条消息
+- 🎨 使用 app5 的界面效果（分割线、行号、提示栏）
+- 🚀 异步处理多个请求，响应在下次输入前批量显示
+- 📊 实时显示待处理任务数量（"⏳ N 个处理中"）
+
+界面设计（与 app5 相同）：
+  ─────────────────────────────────────
+  1> 第一行文本
+  2> 第二行文本
+  ─────────────────────────────────────
+  ⏳ 2 个处理中 | Ctrl+J 换行 | Enter 发送 | 连按两次 Ctrl+C 退出
+
+工作流程：
+  1. 用户输入消息，按 Enter 提交
+  2. 立即显示用户消息，启动后台 LLM 任务
+  3. 立即返回输入界面，可以继续输入下一条
+  4. 后台任务完成时，响应暂存到 pending_outputs
+  5. 下次获取输入前，自动显示所有已完成的响应
+
+技术要点：
+- 使用 Application.run_async() 支持异步
+- 输出暂存机制避免 Application 运行时输出导致界面错乱
+- 完美结合 app5 界面效果和 app6 异步能力
 """
 
 import argparse
@@ -22,14 +42,12 @@ if __name__ == "__main__" and __package__ is None:
     from apps.app6.config import OPENROUTER_API_KEY, OPENROUTER_BASE_URL, MODEL, TEMPERATURE, MAX_TOKENS
     from apps.app6.tools import get_current_time, end_chat
     from apps.app6.router import route_intent_async, render_history
-    from apps.app6.tui import ChatTUI
-    from apps.app6.ui import AsyncChatUI, print_user, print_assistant, console
+    from apps.app6.ui import AsyncChatUI, print_user, print_assistant
 else:
     from .config import OPENROUTER_API_KEY, OPENROUTER_BASE_URL, MODEL, TEMPERATURE, MAX_TOKENS
     from .tools import get_current_time, end_chat
     from .router import route_intent_async, render_history
-    from .tui import ChatTUI
-    from .ui import AsyncChatUI, print_user, print_assistant, console
+    from .ui import AsyncChatUI, print_user, print_assistant
 
 
 def parse_args():
@@ -126,6 +144,9 @@ async def async_main():
     # 处理管道输入
     is_piped = not sys.stdin.isatty()
 
+    # 初始化历史
+    history: list = []
+
     if is_piped:
         piped_lines = [line.strip() for line in sys.stdin.read().splitlines() if line.strip()]
 
@@ -139,63 +160,85 @@ async def async_main():
             if session.should_exit:
                 return
 
+        # 保留管道模式的历史
+        history = session.history
+
         if not args.interactive:
             return
 
-        console.print("\n[dim]─── 进入 TUI 模式 ───[/dim]\n")
+        # 进入交互模式
+        from rich.console import Console
+        Console().print("\n[dim]─── 进入交互模式 ───[/dim]\n")
 
-    # TUI 交互模式
-    history: list = []
+    # 交互模式：使用 app5 界面 + 异步处理
+    ui = AsyncChatUI()
+    pending_tasks = []
 
-    async def on_submit(user_input: str):
-        """处理用户提交"""
-        tui.set_waiting(True)
-        tui.add_user_message(user_input)
+    while True:
+        # 获取输入（会先显示所有待输出的响应）
+        user_input = await ui.get_input_async()
+        if user_input is None:
+            break
+
+        # 显示用户消息
+        ui.add_pending_output("user", user_input)
+        ui.flush_pending_outputs()
+
         history.append(HumanMessage(content=user_input))
 
-        try:
-            action = await route_intent_async(llm, user_input, history)
+        # 后台处理（不等待）- 使用 default 参数捕获当前输入
+        async def process(msg=user_input):
+            try:
+                action = await route_intent_async(llm, msg, history)
 
-            if action == "time":
-                result = get_current_time.invoke({})
-                reply = f"当前时间：{result}"
-                history.append(AIMessage(content=reply))
-                tui.add_assistant_message(reply, tool_name="get_current_time")
+                if action == "time":
+                    result = get_current_time.invoke({})
+                    reply = f"当前时间：{result}"
+                    history.append(AIMessage(content=reply))
+                    ui.add_pending_output("assistant", reply, tool_name="get_current_time")
 
-            elif action == "end":
-                result = end_chat.invoke({"reason": user_input})
-                history.append(AIMessage(content=result))
-                tui.add_assistant_message(result, tool_name="end_chat")
-                tui.exit()
+                elif action == "end":
+                    result = end_chat.invoke({"reason": user_input})
+                    history.append(AIMessage(content=result))
+                    ui.add_pending_output("assistant", result, tool_name="end_chat")
+                    ui.should_exit = True
 
-            elif action == "summary":
-                sys_msg = SystemMessage(content="用 2-3 句话简洁总结这段对话的主要内容。")
-                human_msg = HumanMessage(content=f"对话内容：\n{render_history(history)}")
-                try:
-                    resp = await llm.ainvoke([sys_msg, human_msg])
-                    reply = resp.content
-                except Exception as exc:
-                    reply = f"总结失败：{exc}"
-                history.append(AIMessage(content=reply))
-                tui.add_assistant_message(reply, tool_name="LLM:summary")
+                elif action == "summary":
+                    sys_msg = SystemMessage(content="用 2-3 句话简洁总结这段对话的主要内容。")
+                    human_msg = HumanMessage(content=f"对话内容：\n{render_history(history)}")
+                    try:
+                        resp = await llm.ainvoke([sys_msg, human_msg])
+                        reply = resp.content
+                    except Exception as exc:
+                        reply = f"总结失败：{exc}"
+                    history.append(AIMessage(content=reply))
+                    ui.add_pending_output("assistant", reply, tool_name="LLM:summary")
 
-            else:  # chat
-                sys_msg = SystemMessage(
-                    content="你是一个有帮助的中文助手。根据对话上下文回答用户问题。"
-                )
-                try:
-                    resp = await llm.ainvoke([sys_msg] + history)
-                    reply = resp.content
-                except Exception as exc:
-                    reply = f"回答失败：{exc}"
-                history.append(AIMessage(content=reply))
-                tui.add_assistant_message(reply, tool_name="LLM:chat")
+                else:  # chat
+                    sys_msg = SystemMessage(
+                        content="你是一个有帮助的中文助手。根据对话上下文回答用户问题。"
+                    )
+                    try:
+                        resp = await llm.ainvoke([sys_msg] + history)
+                        reply = resp.content
+                    except Exception as exc:
+                        reply = f"回答失败：{exc}"
+                    history.append(AIMessage(content=reply))
+                    ui.add_pending_output("assistant", reply, tool_name="LLM:chat")
 
-        finally:
-            tui.set_waiting(False)
+            finally:
+                ui.update_pending(-1)
 
-    tui = ChatTUI(on_submit=on_submit)
-    await tui.run()
+        # 启动后台任务
+        task = asyncio.create_task(process())
+        pending_tasks.append(task)
+        ui.update_pending(1)
+
+        # 如果用户要退出，等待所有任务完成
+        if ui.should_exit:
+            for task in pending_tasks:
+                await task
+            break
 
 
 def main():

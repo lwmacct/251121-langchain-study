@@ -1,10 +1,29 @@
-"""App6 异步用户界面模块 - 支持并发输入编辑"""
+"""App6 异步用户界面模块 - 基于 app5 界面 + 异步能力
+
+设计理念：
+- 保持 app5 的 Application 界面（分割线、行号、提示栏）
+- 增加异步能力：输入后立即可输入下一条，不等待 LLM
+- 输出时机：获取下一次输入前，批量显示已完成的响应
+- 避免 Application 运行时输出导致界面错乱
+
+界面外观（与 app5 相同）：
+  ─────────────────────────────────
+  1> 第一行文本
+  2> 第二行文本
+  ─────────────────────────────────
+  Ctrl+J 换行 | Enter 发送 | 连按两次 Ctrl+C 退出
+
+关键改进：
+- 使用 run_async() 支持异步
+- 后台响应暂存，在下次输入前显示
+- 状态栏显示待处理任务数
+"""
 
 import asyncio
 import sys
 import time
 import shutil
-from typing import Callable, Any
+from typing import List, Tuple
 
 from rich.console import Console
 from rich.text import Text
@@ -34,18 +53,38 @@ def print_assistant(content: str, tool_name: str | None = None):
 
 
 class AsyncChatUI:
-    """异步聊天界面 - 支持在等待 LLM 时继续编辑输入"""
+    """异步聊天界面 - 基于 app5 的 Application 布局 + 异步能力"""
 
     def __init__(self):
         self.history = InMemoryHistory()
         self.pending_count = 0  # 等待中的 LLM 请求数
-        self.hint_text = "Ctrl+J 换行 | Enter 发送 | 连按两次 Ctrl+C 退出"
-        self.last_ctrl_c_time = 0
         self.should_exit = False
-        self._current_app = None
-        self._waiting_response = False  # 是否正在等待响应
+        self.last_ctrl_c_time = 0
+        self.pending_outputs: List[Tuple[str, str, str]] = []  # (type, content, tool_name)
 
-    def _get_width(self):
+    def set_waiting(self, waiting: bool):
+        """设置等待状态（保留兼容性）"""
+        pass
+
+    def update_pending(self, delta: int):
+        """更新等待中的请求数"""
+        self.pending_count = max(0, self.pending_count + delta)
+
+    def add_pending_output(self, output_type: str, content: str, tool_name: str = None):
+        """添加待显示的输出"""
+        self.pending_outputs.append((output_type, content, tool_name))
+
+    def flush_pending_outputs(self):
+        """显示所有待输出的消息"""
+        for output_type, content, tool_name in self.pending_outputs:
+            if output_type == "user":
+                print_user(content)
+            elif output_type == "assistant":
+                print_assistant(content, tool_name)
+        self.pending_outputs.clear()
+
+    @staticmethod
+    def _get_width():
         try:
             return shutil.get_terminal_size().columns
         except Exception:
@@ -54,33 +93,26 @@ class AsyncChatUI:
     def _get_separator(self):
         return "─" * self._get_width()
 
-    def _get_status_hint(self):
-        """获取状态提示，包含等待状态"""
-        if self._waiting_response:
-            return f" [yellow]⏳ 等待响应中... (可编辑，暂不可发送)[/yellow]"
-        return f" {self.hint_text}"
-
-    def set_waiting(self, waiting: bool):
-        """设置等待状态"""
-        self._waiting_response = waiting
-        if self._current_app:
-            self._current_app.invalidate()
-
-    def update_pending(self, delta: int):
-        """更新等待中的请求数"""
-        self.pending_count = max(0, self.pending_count + delta)
-        if self._current_app:
-            self._current_app.invalidate()
+    def _get_hint_text(self):
+        """获取提示文本，包含待处理任务数"""
+        if self.pending_count > 0:
+            return f" ⏳ {self.pending_count} 个处理中 | Ctrl+J 换行 | Enter 发送 | 连按两次 Ctrl+C 退出"
+        return " Ctrl+J 换行 | Enter 发送 | 连按两次 Ctrl+C 退出"
 
     async def get_input_async(self) -> str | None:
-        """异步获取用户输入"""
-        result_text = [None]
+        """异步获取用户输入 - 使用 app5 的 Application 布局"""
+        # 先显示所有待输出的消息
+        self.flush_pending_outputs()
 
+        result_text = [None]
         buffer = Buffer(
             history=self.history,
             multiline=True,
         )
 
+        hint_text = [self._get_hint_text()]
+
+        # 按键绑定
         kb = KeyBindings()
 
         @kb.add(Keys.ControlJ)
@@ -89,9 +121,6 @@ class AsyncChatUI:
 
         @kb.add(Keys.Enter)
         def _(event):
-            # 等待响应期间不允许发送
-            if self._waiting_response:
-                return
             buf = event.current_buffer
             if buf.text.strip():
                 result_text[0] = buf.text
@@ -105,15 +134,14 @@ class AsyncChatUI:
                 event.app.exit()
             else:
                 self.last_ctrl_c_time = current_time
-                self.hint_text = "^C (再按一次退出)"
+                hint_text[0] = " ^C (再按一次退出)"
                 event.current_buffer.reset()
                 event.app.invalidate()
 
                 def reset_hint():
-                    if self.hint_text == "^C (再按一次退出)":
-                        self.hint_text = "Ctrl+J 换行 | Enter 发送 | 连按两次 Ctrl+C 退出"
-                        if self._current_app:
-                            self._current_app.invalidate()
+                    hint_text[0] = self._get_hint_text()
+                    if hasattr(event.app, 'invalidate'):
+                        event.app.invalidate()
 
                 event.app.loop.call_later(1.0, reset_hint)
 
@@ -123,10 +151,12 @@ class AsyncChatUI:
             event.app.exit()
 
         def get_height():
+            """动态高度"""
             text = buffer.text
             line_count = text.count('\n') + 1 if text else 1
             return Dimension(min=1, max=10, preferred=line_count, weight=1)
 
+        # 创建布局（与 app5 相同）
         layout = Layout(
             HSplit([
                 Window(
@@ -147,7 +177,7 @@ class AsyncChatUI:
                     style="class:separator",
                 ),
                 Window(
-                    content=FormattedTextControl(lambda: self._get_status_hint()),
+                    content=FormattedTextControl(lambda: hint_text[0]),
                     height=1,
                     style="class:hint",
                 ),
@@ -161,20 +191,18 @@ class AsyncChatUI:
             mouse_support=False,
         )
 
-        self._current_app = app
-
         try:
             await app.run_async()
+
             if self.should_exit:
                 return None
+
             if result_text[0]:
                 return result_text[0].strip()
             return None
         except EOFError:
             self.should_exit = True
             return None
-        finally:
-            self._current_app = None
 
 
 async def get_input_iterator_async(interactive_after_pipe: bool = False):

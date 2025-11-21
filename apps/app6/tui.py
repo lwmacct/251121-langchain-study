@@ -1,217 +1,178 @@
-"""App6 专业 TUI 模块 - 分离对话区和输入区"""
+"""App6 TUI 模块 - 使用 Textual 实现专业 TUI"""
 
 import asyncio
-import time
-import shutil
 from typing import Callable
 
-from prompt_toolkit.application import Application
-from prompt_toolkit.buffer import Buffer
-from prompt_toolkit.document import Document
-from prompt_toolkit.history import InMemoryHistory
-from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.keys import Keys
-from prompt_toolkit.layout import Layout, HSplit, Window, FormattedTextControl, BufferControl, Dimension
-from prompt_toolkit.layout.containers import ConditionalContainer
-from prompt_toolkit.lexers import SimpleLexer
+from textual.app import App, ComposeResult
+from textual.containers import Container, Vertical, Horizontal
+from textual.widgets import Static, RichLog, Footer, TextArea
+from textual.binding import Binding
+from textual import events
+
+from rich.console import Console
+from rich.text import Text
+
+console = Console()
 
 
-class ChatTUI:
-    """专业聊天 TUI - 分离对话区和输入区"""
+def print_user(content: str):
+    """打印用户消息（用于管道模式）"""
+    console.print(Text("用户: ", style="bold green") + Text(content))
 
-    def __init__(self, on_submit: Callable[[str], None] = None):
-        """
-        Args:
-            on_submit: 用户提交消息时的回调函数
-        """
+
+def print_assistant(content: str, tool_name: str = None):
+    """打印助手消息（用于管道模式）"""
+    if tool_name:
+        tag = Text(f"[{tool_name}] ", style="bold magenta")
+        console.print(Text("助手: ", style="bold blue") + tag + Text(content))
+    else:
+        console.print(Text("助手: ", style="bold blue") + Text(content))
+
+
+class ChatTUI(App):
+    """聊天 TUI 应用"""
+
+    CSS = """
+    #chat-container {
+        height: 1fr;
+        border: solid green;
+    }
+
+    #chat-log {
+        height: 1fr;
+        scrollbar-gutter: stable;
+    }
+
+    #input-container {
+        height: auto;
+        max-height: 10;
+        border: solid blue;
+    }
+
+    #status {
+        height: 1;
+        background: $surface;
+        color: $text-muted;
+        padding: 0 1;
+    }
+
+    #input {
+        height: auto;
+        min-height: 3;
+        max-height: 10;
+    }
+    """
+
+    BINDINGS = [
+        Binding("ctrl+c", "quit", "退出", show=True),
+        Binding("ctrl+d", "quit", "退出", show=False),
+        Binding("pageup", "scroll_up", "向上滚动", show=False),
+        Binding("pagedown", "scroll_down", "向下滚动", show=False),
+    ]
+
+    def __init__(self, on_submit: Callable = None):
+        super().__init__()
         self.on_submit = on_submit
-        self.history = InMemoryHistory()
-        self.chat_content = []  # 存储对话内容
-        self.hint_text = "Ctrl+J 换行 | Enter 发送 | Ctrl+C 退出"
-        self.last_ctrl_c_time = 0
-        self.should_exit = False
-        self._waiting_response = False
-        self._app = None
+        self._waiting = False
 
-        # 创建缓冲区
-        self._input_buffer = Buffer(
-            history=self.history,
-            multiline=True,
-            on_text_changed=lambda _: self._on_input_changed(),
+    def compose(self) -> ComposeResult:
+        yield Container(
+            RichLog(id="chat-log", wrap=True, highlight=True, markup=True),
+            id="chat-container",
         )
-
-        self._chat_buffer = Buffer(
-            read_only=True,
-            document=Document(""),
+        yield Container(
+            TextArea(id="input"),
+            id="input-container",
         )
+        yield Static("Enter 发送 | Ctrl+J 换行 | PageUp/Down 滚动 | Ctrl+C 退出", id="status")
 
-    def _get_width(self):
-        try:
-            return shutil.get_terminal_size().columns
-        except Exception:
-            return 80
+    def on_mount(self) -> None:
+        """挂载时聚焦输入框"""
+        self.query_one("#input", TextArea).focus()
 
-    def _get_separator(self):
-        return "─" * self._get_width()
+    def action_scroll_up(self) -> None:
+        """向上滚动对话区"""
+        log = self.query_one("#chat-log", RichLog)
+        log.scroll_up(animate=False)
 
-    def _get_status_hint(self):
-        """获取状态提示"""
-        if self._waiting_response:
-            return " ⏳ 等待响应中... (可编辑，暂不可发送)"
-        return f" {self.hint_text}"
+    def action_scroll_down(self) -> None:
+        """向下滚动对话区"""
+        log = self.query_one("#chat-log", RichLog)
+        log.scroll_down(animate=False)
 
-    def _on_input_changed(self):
-        """输入内容变化时刷新"""
-        if self._app:
-            self._app.invalidate()
+    async def on_key(self, event: events.Key) -> None:
+        """处理按键事件"""
+        input_widget = self.query_one("#input", TextArea)
 
-    def _get_input_height(self):
-        """动态计算输入框高度"""
-        text = self._input_buffer.text
-        line_count = text.count('\n') + 1 if text else 1
-        return Dimension(min=1, max=10, preferred=line_count, weight=1)
+        # 只在输入框聚焦时处理
+        if not input_widget.has_focus:
+            return
 
-    def set_waiting(self, waiting: bool):
-        """设置等待状态"""
-        self._waiting_response = waiting
-        if self._app:
-            self._app.invalidate()
-
-    def add_message(self, role: str, content: str, tag: str = None):
-        """添加消息到对话区"""
-        if tag:
-            line = f"{role}: [{tag}] {content}"
-        else:
-            line = f"{role}: {content}"
-        self.chat_content.append(line)
-
-        # 更新对话区缓冲区
-        full_text = "\n".join(self.chat_content)
-        self._chat_buffer.set_document(
-            Document(full_text, cursor_position=len(full_text)),
-            bypass_readonly=True
-        )
-
-        if self._app:
-            self._app.invalidate()
-
-    def add_user_message(self, content: str):
-        """添加用户消息"""
-        self.add_message("用户", content)
-
-    def add_assistant_message(self, content: str, tool_name: str = None):
-        """添加助手消息"""
-        self.add_message("助手", content, tool_name)
-
-    def _create_layout(self):
-        """创建 TUI 布局"""
-        # 按键绑定
-        kb = KeyBindings()
-
-        @kb.add(Keys.ControlJ)
-        def _(event):
-            event.current_buffer.insert_text("\n")
-
-        @kb.add(Keys.Enter)
-        def _(event):
-            if self._waiting_response:
+        if event.key == "enter":
+            # Enter 发送消息
+            if self._waiting:
+                event.prevent_default()
                 return
-            text = self._input_buffer.text.strip()
+
+            text = input_widget.text.strip()
             if text:
-                # 清空输入框
-                self._input_buffer.reset()
-                # 触发提交回调
-                if self.on_submit:
-                    asyncio.create_task(self._handle_submit(text))
+                event.prevent_default()
+                await self._submit_message(text)
 
-        @kb.add(Keys.ControlC)
-        def _(event):
-            current_time = time.time()
-            if current_time - self.last_ctrl_c_time < 1.0:
-                self.should_exit = True
-                event.app.exit()
-            else:
-                self.last_ctrl_c_time = current_time
-                self.hint_text = "^C (再按一次退出)"
-                self._input_buffer.reset()
-                event.app.invalidate()
+        elif event.key == "ctrl+j":
+            # Ctrl+J 换行
+            event.prevent_default()
+            input_widget.insert("\n")
 
-                def reset_hint():
-                    if self.hint_text == "^C (再按一次退出)":
-                        self.hint_text = "Ctrl+J 换行 | Enter 发送 | Ctrl+C 退出"
-                        if self._app:
-                            self._app.invalidate()
+    async def _submit_message(self, text: str) -> None:
+        """提交消息"""
+        # 清空输入框
+        input_widget = self.query_one("#input", TextArea)
+        input_widget.clear()
 
-                event.app.loop.call_later(1.0, reset_hint)
+        # 添加用户消息
+        self.add_user_message(text)
 
-        @kb.add(Keys.ControlD)
-        def _(event):
-            self.should_exit = True
-            event.app.exit()
+        # 设置等待状态
+        self.set_waiting(True)
 
-        # 输入区域控件
-        input_window = Window(
-            content=BufferControl(buffer=self._input_buffer, lexer=SimpleLexer()),
-            height=self._get_input_height,
-            wrap_lines=True,
-            get_line_prefix=lambda line_no, wrap_count: f"{line_no + 1}> " if wrap_count == 0 else "   ",
-        )
+        # 在后台处理消息
+        asyncio.create_task(self._process_message(text))
 
-        # 布局
-        root_container = HSplit([
-            # 对话内容区 - 占据大部分空间
-            Window(
-                content=BufferControl(buffer=self._chat_buffer),
-                wrap_lines=True,
-                height=Dimension(weight=1),  # 自动填充剩余空间
-            ),
-            # 分隔线
-            Window(
-                content=FormattedTextControl(lambda: self._get_separator()),
-                height=1,
-            ),
-            # 输入区域
-            input_window,
-            # 分隔线
-            Window(
-                content=FormattedTextControl(lambda: self._get_separator()),
-                height=1,
-            ),
-            # 状态提示
-            Window(
-                content=FormattedTextControl(lambda: self._get_status_hint()),
-                height=1,
-            ),
-        ])
+    def add_user_message(self, content: str) -> None:
+        """添加用户消息"""
+        log = self.query_one("#chat-log", RichLog)
+        log.write(Text("用户: ", style="bold green") + Text(content))
 
-        # 设置焦点到输入窗口
-        layout = Layout(root_container, focused_element=input_window)
+    def add_assistant_message(self, content: str, tool_name: str = None) -> None:
+        """添加助手消息"""
+        log = self.query_one("#chat-log", RichLog)
+        if tool_name:
+            tag = Text(f"[{tool_name}] ", style="bold magenta")
+            log.write(Text("助手: ", style="bold blue") + tag + Text(content))
+        else:
+            log.write(Text("助手: ", style="bold blue") + Text(content))
 
-        return layout, kb
+    def set_waiting(self, waiting: bool) -> None:
+        """设置等待状态"""
+        self._waiting = waiting
+        status = self.query_one("#status", Static)
 
-    async def _handle_submit(self, text: str):
-        """处理提交"""
+        if waiting:
+            status.update("⏳ 等待响应中... (可编辑，暂不可发送)")
+        else:
+            status.update("Enter 发送 | Ctrl+J 换行 | PageUp/Down 滚动 | Ctrl+C 退出")
+
+    async def _process_message(self, text: str) -> None:
+        """后台处理消息"""
         if self.on_submit:
-            await self.on_submit(text)
+            try:
+                should_exit = await self.on_submit(text)
+                if should_exit:
+                    self.exit()
+            finally:
+                self.set_waiting(False)
 
-    async def run(self):
-        """运行 TUI"""
-        layout, kb = self._create_layout()
-
-        self._app = Application(
-            layout=layout,
-            key_bindings=kb,
-            full_screen=True,
-            mouse_support=False,
-        )
-
-        try:
-            await self._app.run_async()
-        finally:
-            self._app = None
-
-    def exit(self):
+    def action_quit(self) -> None:
         """退出应用"""
-        self.should_exit = True
-        if self._app:
-            self._app.exit()
+        self.exit()
