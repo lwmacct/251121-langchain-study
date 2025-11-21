@@ -266,7 +266,7 @@ def get_input_iterator(interactive_after_pipe: bool = False):
                     height=get_height,
                     wrap_lines=True,
                     left_margins=[],
-                    get_line_prefix=lambda line_no, wrap_count: "> " if line_no == 0 and wrap_count == 0 else "  ",
+                    get_line_prefix=lambda line_no, wrap_count: f"{line_no + 1}> " if wrap_count == 0 else "   ",
                 ),
                 # 下分隔线
                 Window(
