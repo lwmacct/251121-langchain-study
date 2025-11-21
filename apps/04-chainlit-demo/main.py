@@ -2,15 +2,14 @@
 import operator
 import os
 import base64
-import io
 from typing import Annotated, Sequence, TypedDict
-from PIL import Image
-
 
 import chainlit as cl
 from langchain_core.messages import AnyMessage, HumanMessage
 from langgraph.graph import StateGraph, START, END
 from langchain_openai import ChatOpenAI
+
+from utils import compress_image_if_needed
 
 # 或者 from langchain_volcengine import ChatVolcEngine 等
 
@@ -24,38 +23,6 @@ llm = ChatOpenAI(
     api_key=api_key,
     streaming=True,
 )  # 换成你的模型
-
-
-def compress_image(image_path: str, max_size: int = 1024, quality: int = 85) -> bytes:
-    """
-    压缩图片以减小文件大小
-
-    Args:
-        image_path: 图片文件路径
-        max_size: 最大宽度或高度（像素）
-        quality: JPEG 质量（1-100）
-
-    Returns:
-        压缩后的图片字节数据
-    """
-    # 打开图片
-    img = Image.open(image_path)
-
-    # 转换 RGBA 为 RGB（如果需要）
-    if img.mode in ("RGBA", "LA", "P"):
-        background = Image.new("RGB", img.size, (255, 255, 255))
-        if img.mode == "P":
-            img = img.convert("RGBA")
-        background.paste(img, mask=img.split()[-1] if img.mode in ("RGBA", "LA") else None)
-        img = background
-
-    # 计算新尺寸（保持宽高比）
-    img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
-
-    # 保存到字节流
-    output = io.BytesIO()
-    img.save(output, format="JPEG", quality=quality, optimize=True)
-    return output.getvalue()
 
 
 class State(TypedDict):
@@ -94,14 +61,14 @@ async def main(message: cl.Message):
         images = [file for file in message.elements if file.mime and "image" in file.mime]
 
         for image in images:
-            # 压缩图片并转换为 base64
+            # 智能压缩图片（仅在必要时）并转换为 base64
             try:
-                compressed_image = compress_image(image.path, max_size=1024, quality=85)
+                compressed_image = compress_image_if_needed(image.path, max_size_mb=5.0, max_dimension=1568, quality=85)  # Claude API 限制 5MB  # Claude 推荐 1568px  # 业界标准
                 image_data = base64.b64encode(compressed_image).decode("utf-8")
 
                 # 打印调试信息
                 print(f"图片信息: name={image.name}, mime={image.mime}, path={image.path}")
-                print(f"压缩后 Base64 长度: {len(image_data)} (原始: {os.path.getsize(image.path)})")
+                print(f"Base64 长度: {len(image_data)} (原始文件: {os.path.getsize(image.path)} bytes)")
 
                 # 添加图片内容块（统一使用 JPEG MIME 类型）
                 content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}})
