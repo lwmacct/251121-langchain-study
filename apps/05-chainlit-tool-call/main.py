@@ -11,8 +11,10 @@ from langchain_openai import ChatOpenAI
 
 
 # app 组件导入
-import tools
 import handlers
+
+# Import tools from shared workspace library
+from tools import get_current_time, calculator
 
 
 # 或者 from langchain_volcengine import ChatVolcEngine 等
@@ -29,8 +31,8 @@ llm = ChatOpenAI(
 )  # 换成你的模型
 
 # ===== 配置工具 =====
-# 工具列表
-tools = [tools.get_current_time, tools.calculator]
+# 工具列表（从 workspace 库导入）
+tools = [get_current_time, calculator]
 
 # 创建工具节点
 tool_node = ToolNode(tools)
