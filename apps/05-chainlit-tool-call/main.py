@@ -1,17 +1,19 @@
 # app.py
 import operator
 import os
-import base64
 from typing import Annotated, Sequence, TypedDict
 
 import chainlit as cl
-from langchain_core.messages import AnyMessage, HumanMessage, AIMessage, ToolMessage
+from langchain_core.messages import AnyMessage
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode
 from langchain_openai import ChatOpenAI
 
-from utils import compress_image_if_needed
-from tools import get_current_time, calculator
+
+# app 组件导入
+import tools
+import handlers
+
 
 # 或者 from langchain_volcengine import ChatVolcEngine 等
 
@@ -28,7 +30,7 @@ llm = ChatOpenAI(
 
 # ===== 配置工具 =====
 # 工具列表
-tools = [get_current_time, calculator]
+tools = [tools.get_current_time, tools.calculator]
 
 # 创建工具节点
 tool_node = ToolNode(tools)
@@ -81,135 +83,82 @@ graph.add_edge("tools", "model")  # 工具执行后返回模型
 app = graph.compile()
 
 
+# ===== 预设问题配置 =====
+PRESET_QUESTIONS = [
+    {"name": "time_query", "label": "⏰ 查询当前时间", "question": "现在几点了？请告诉我当前的时间。", "description": "触发 get_current_time 工具"},
+    {"name": "math_calc", "label": "🔢 数学计算", "question": "请帮我计算 42 * 7 等于多少？", "description": "触发 calculator 工具"},
+    {"name": "multi_tool", "label": "🔧 多工具组合", "question": "现在几点了？另外帮我算一下 100 除以 4 等于多少。", "description": "同时触发多个工具"},
+    {"name": "agi_question", "label": "🤖 AGI 预测", "question": "你觉得人工智能 AGI 在多少年后实现，那时是几几年？", "description": "时间查询 + 推理"},
+    {"name": "normal_chat", "label": "💬 普通对话", "question": "你好！请介绍一下你自己和你的能力。", "description": "不触发工具"},
+]
+
+
+@cl.on_chat_start
+async def on_chat_start():
+    """
+    聊天开始时的钩子：显示欢迎消息和预设问题供用户选择
+    """
+    # 发送欢迎消息
+    await cl.Message(
+        content="""# 🎯 欢迎使用 LangGraph + Chainlit 工具调用演示！
+
+这是一个智能 AI 助手，具备以下能力：
+
+✨ **核心功能**
+- 🔧 **工具调用**: 可以调用时间查询、计算器等工具
+- 🖼️ **多模态支持**: 支持文本和图片分析
+- 👁️ **可视化追踪**: 实时显示工具执行过程
+
+📋 **可用工具**
+1. `get_current_time` - 获取当前时间
+2. `calculator` - 执行数学计算
+
+---
+
+请从下方选择一个预设问题开始体验，或直接输入你的问题：
+"""
+    ).send()
+
+    # 构建 Action 列表
+    actions = [
+        cl.Action(
+            name=q["name"],
+            payload={"question": q["question"]},
+            label=q["label"],
+            description=q["description"],
+        )
+        for q in PRESET_QUESTIONS
+    ]
+
+    # 询问用户选择
+    res = await cl.AskActionMessage(
+        content="**🎬 选择一个预设问题开始：**",
+        actions=actions,
+        timeout=300,  # 5 分钟超时
+        raise_on_timeout=False,
+    ).send()
+
+    # 处理用户选择
+    if res and res.get("payload"):
+        selected_question = res["payload"]["question"]
+
+        # 显示用户选择的问题
+        await cl.Message(content=f"**你选择的问题：** {selected_question}", author="User").send()
+
+        # 处理选中的问题（传入 app 对象）
+        await handlers.handle_user_message(app, selected_question)
+    else:
+        # 用户未选择或超时
+        await cl.Message(content="💡 **提示**: 你可以直接输入问题开始对话，或上传图片进行分析！").send()
+
+
 @cl.on_message
 async def main(message: cl.Message):
-    # 构建消息内容（支持多模态）
-    content = []
-
-    # 添加文本内容
-    if message.content:
-        content.append({"type": "text", "text": message.content})
-
-    # 处理上传的图片
-    if message.elements:
-        images = [file for file in message.elements if file.mime and "image" in file.mime]
-
-        for image in images:
-            # 智能压缩图片（仅在必要时）并转换为 base64
-            try:
-                compressed_image = compress_image_if_needed(image.path, max_size_mb=5.0, max_dimension=1568, quality=85)  # Claude API 限制 5MB  # Claude 推荐 1568px  # 业界标准
-                image_data = base64.b64encode(compressed_image).decode("utf-8")
-
-                # 打印调试信息
-                print(f"图片信息: name={image.name}, mime={image.mime}, path={image.path}")
-                print(f"Base64 长度: {len(image_data)} (原始文件: {os.path.getsize(image.path)} bytes)")
-
-                # 添加图片内容块（统一使用 JPEG MIME 类型）
-                content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}})
-            except Exception as e:
-                print(f"图片处理失败: {e}")
-                await cl.Message(content=f"图片处理失败: {e}").send()
-                return
-
-        if images:
-            await cl.Message(content=f"收到 {len(images)} 张图片，正在分析...").send()
-
-    # 如果没有任何内容，返回提示
-    if not content:
-        await cl.Message(content="请发送文本或图片").send()
-        return
-
-    # 构建 HumanMessage（多模态）
-    human_message = HumanMessage(content=content)
-
-    # 打印消息结构（截断 base64 以避免过长）
-    print(f"发送的消息内容块数量: {len(content)}")
-    for i, block in enumerate(content):
-        if block.get("type") == "text":
-            print(f"  块 {i}: 文本 = {block['text'][:50]}...")
-        elif block.get("type") == "image_url":
-            url = block["image_url"]["url"]
-            print(f"  块 {i}: 图片 URL 前缀 = {url[:100]}...")
-
-    # 使用流式处理，捕获工具调用过程
-    try:
-        print("\n" + "=" * 50)
-        print("🚀 开始处理用户请求")
-        print("=" * 50)
-
-        final_response = None
-        tool_call_count = 0
-
-        # 使用 astream 流式处理
-        async for event in app.astream({"messages": [human_message]}, stream_mode="values"):
-            messages = event.get("messages", [])
-            if not messages:
-                continue
-
-            last_message = messages[-1]
-
-            # 检测到 AI 消息且有工具调用
-            if isinstance(last_message, AIMessage) and last_message.tool_calls:
-                tool_call_count += 1
-                print(f"\n📋 检测到工具调用 (第 {tool_call_count} 轮)")
-
-                # 在界面上显示工具调用信息
-                for tool_call in last_message.tool_calls:
-                    tool_name = tool_call.get("name", "unknown")
-                    tool_args = tool_call.get("args", {})
-
-                    print(f"  🔧 工具: {tool_name}")
-                    print(f"  📝 参数: {tool_args}")
-
-                    # 在 Chainlit UI 中显示（使用简单名称避免 avatar URL 问题）
-                    async with cl.Step(name=f"Calling {tool_name}", type="tool") as step:
-                        step.input = str(tool_args)
-                        await step.stream_token(f"🔧 Calling tool: `{tool_name}`\n\n")
-                        await step.stream_token(f"📝 Arguments: `{tool_args}`")
-
-            # 检测到工具消息（工具返回结果）
-            elif isinstance(last_message, ToolMessage):
-                # 这是 ToolMessage
-                tool_name = getattr(last_message, "name", "unknown")
-                tool_result = last_message.content
-
-                print(f"  ✅ 工具 {tool_name} 返回结果: {tool_result[:100]}...")
-
-                # 在 Chainlit UI 中显示工具结果（使用英文避免编码问题）
-                async with cl.Step(name=f"Tool Result: {tool_name}", type="tool") as step:
-                    step.output = tool_result
-
-            # 更新最终响应
-            final_response = last_message
-
-        print("\n" + "=" * 50)
-        print(f"✨ 处理完成 (共调用 {tool_call_count} 轮工具)")
-        print("=" * 50 + "\n")
-
-        # 发送最终响应
-        if final_response and hasattr(final_response, "content"):
-            await cl.Message(content=final_response.content).send()
-        else:
-            await cl.Message(content="处理完成，但没有收到响应").send()
-
-    except Exception as e:
-        # 打印详细错误信息到控制台
-        import traceback
-
-        print(f"\n❌ 错误详情：{type(e).__name__}: {e}")
-        print(f"完整堆栈：\n{traceback.format_exc()}")
-
-        # 尝试提取更多错误信息
-        error_msg = f"LLM 调用失败：{type(e).__name__}: {str(e)}"
-        if hasattr(e, "response"):
-            print(f"API 响应: {e.response}")
-            error_msg += f"\nAPI 响应: {e.response}"
-        if hasattr(e, "body"):
-            print(f"错误体: {e.body}")
-            error_msg += f"\n错误体: {e.body}"
-
-        await cl.Message(content=error_msg).send()
-        return
+    """
+    处理用户发送的消息（支持文本和图片）
+    """
+    # 调用 handler 处理消息（传入 app 对象）
+    await handlers.handle_user_message(app, message.content, message.elements)
 
 
 """
