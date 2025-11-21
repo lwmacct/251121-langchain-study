@@ -1,7 +1,10 @@
 {
   "permissions": {
-    "allow": ["WebSearch"],
+    "allow": [
+      "WebSearch"
+    ],
     "deny": [],
     "defaultMode": "bypassPermissions"
-  }
+  },
+  "outputStyle": "Explanatory"
 }
