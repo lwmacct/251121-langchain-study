@@ -1,95 +1,190 @@
-"""App6 异步用户界面模块 - 底部固定输入区 + 上方滚动输出
+"""App6 用户界面模块
 
-设计理念：
-- **上方区域**：Rich print 正常输出，终端自然滚动（历史消息）
-- **底部固定区域**：prompt_toolkit 输入框，固定占用底部几行
-- 后台任务完成时直接 print，输出会向上滚动
-- 输入框始终固定在底部可见
-
-界面外观：
-  用户: 你好                          ← 终端滚动区域
-  助手: [LLM:chat] 你好！...          ← 使用 Rich print
-  用户: 现在几点                      ← 正常向上滚动
-  助手: [get_current_time] 23:00
-  ─────────────────────────────────
-  1> 输入内容...                      ← 固定在底部
-  ─────────────────────────────────
-  ⏳ 2 个处理中 | Ctrl+J 换行 | Enter 发送
-
-关键技术：
-- 输出在两次输入之间进行（Application 不运行时）
-- 输出完成后重新启动 Application
-- 实现"输出向上滚动，输入框固定底部"的效果
+优化：提供更简洁的 UI 实现，同时保留 app5 的优秀交互体验
 """
 
-import asyncio
 import sys
-import time
-import shutil
+from typing import Iterator
 
 from rich.console import Console
 from rich.text import Text
-from prompt_toolkit.application import Application
-from prompt_toolkit.buffer import Buffer
-from prompt_toolkit.history import InMemoryHistory
-from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.keys import Keys
-from prompt_toolkit.layout import Layout, HSplit, Window, FormattedTextControl, BufferControl, Dimension
-from prompt_toolkit.lexers import SimpleLexer
 
 console = Console()
 
 
-def print_user(content: str):
-    """打印用户消息"""
-    console.print(Text("用户: ", style="bold green") + Text(content))
+def print_user(content: str) -> None:
+    """打印用户消息
+
+    Args:
+        content: 用户输入内容
+    """
+    console.print(Text("👤 ", style="bold green") + Text(content))
 
 
-def print_assistant(content: str, tool_name: str | None = None):
-    """打印助手消息"""
-    if tool_name:
-        tag = Text(f"[{tool_name}] ", style="bold magenta")
-        console.print(Text("助手: ", style="bold blue") + tag + Text(content))
+def print_assistant(content: str, tool_calls: list[str] | None = None) -> None:
+    """打印助手消息
+
+    Args:
+        content: 助手回复内容
+        tool_calls: 调用的工具名称列表（可选）
+    """
+    prefix = Text("🤖 ", style="bold blue")
+
+    if tool_calls:
+        tools_text = Text(f"[{', '.join(tool_calls)}] ", style="dim magenta")
+        console.print(prefix + tools_text + Text(content))
     else:
-        console.print(Text("助手: ", style="bold blue") + Text(content))
+        console.print(prefix + Text(content))
 
 
-class AsyncChatUI:
-    """异步聊天界面 - 基于 app5 的 Application 布局 + 异步能力"""
+def print_system(content: str, style: str = "dim yellow") -> None:
+    """打印系统消息
 
-    def __init__(self):
-        self.history = InMemoryHistory()
-        self.pending_count = 0  # 等待中的 LLM 请求数
-        self.should_exit = False
-        self.last_ctrl_c_time = 0
+    Args:
+        content: 系统消息内容
+        style: Rich 样式
+    """
+    console.print(f"[{style}]ℹ️  {content}[/{style}]")
 
-    @staticmethod
-    def _get_width():
+
+def print_error(content: str) -> None:
+    """打印错误消息
+
+    Args:
+        content: 错误内容
+    """
+    console.print(f"[bold red]❌ {content}[/bold red]")
+
+
+def get_input_iterator(interactive_after_pipe: bool = False) -> Iterator[tuple[str, bool]]:
+    """获取输入迭代器，支持管道和交互式模式
+
+    优化：提供简化的输入处理，专注核心功能
+
+    Args:
+        interactive_after_pipe: 管道结束后是否进入交互模式
+
+    Yields:
+        (user_input, from_pipe): 用户输入和是否来自管道的标志
+    """
+    is_piped = not sys.stdin.isatty()
+
+    # 1. 处理管道输入
+    if is_piped:
+        piped_lines = [
+            line.strip() for line in sys.stdin.read().splitlines() if line.strip()
+        ]
+        for line in piped_lines:
+            yield line, True  # 来自管道，需要打印
+
+        if not interactive_after_pipe:
+            return
+
+        print_system("管道输入处理完毕，进入交互模式（Ctrl+D 或 Ctrl+C 退出）\n")
+
+    # 2. 交互式模式 - 简化版本
+    print_system("交互模式 (输入 'quit' 或 'exit' 退出，Ctrl+C 中断)\n")
+
+    while True:
+        try:
+            # 使用 Rich 的输入
+            console.print("[dim]─" * 40 + "[/dim]")
+            user_input = console.input("[bold cyan]你: [/bold cyan]")
+
+            user_input = user_input.strip()
+            if not user_input:
+                continue
+
+            # 检查退出命令
+            if user_input.lower() in ["quit", "exit", "退出", "结束"]:
+                print_system("再见！")
+                break
+
+            yield user_input, False  # 来自交互，不需要打印
+
+        except (EOFError, KeyboardInterrupt):
+            print_system("\n再见！")
+            break
+
+
+# 高级 UI 选项：复用 app5 的 prompt_toolkit 实现
+try:
+    from prompt_toolkit.application import Application
+    from prompt_toolkit.buffer import Buffer
+    from prompt_toolkit.history import InMemoryHistory
+    from prompt_toolkit.key_binding import KeyBindings
+    from prompt_toolkit.keys import Keys
+    from prompt_toolkit.layout import (
+        Layout,
+        HSplit,
+        Window,
+        FormattedTextControl,
+        BufferControl,
+        Dimension,
+    )
+    from prompt_toolkit.lexers import SimpleLexer
+    import time
+    import shutil
+
+    ADVANCED_UI_AVAILABLE = True
+except ImportError:
+    ADVANCED_UI_AVAILABLE = False
+
+
+def get_advanced_input_iterator(
+    interactive_after_pipe: bool = False,
+) -> Iterator[tuple[str, bool]]:
+    """获取输入迭代器 - 高级版本（使用 prompt_toolkit）
+
+    提供多行输入、历史记录、更好的编辑体验
+
+    Args:
+        interactive_after_pipe: 管道结束后是否进入交互模式
+
+    Yields:
+        (user_input, from_pipe): 用户输入和是否来自管道的标志
+    """
+    if not ADVANCED_UI_AVAILABLE:
+        # 降级到简单版本
+        console.print(
+            "[yellow]警告: prompt_toolkit 未安装，使用简化输入模式[/yellow]"
+        )
+        yield from get_input_iterator(interactive_after_pipe)
+        return
+
+    is_piped = not sys.stdin.isatty()
+
+    # 1. 处理管道输入
+    if is_piped:
+        piped_lines = [
+            line.strip() for line in sys.stdin.read().splitlines() if line.strip()
+        ]
+        for line in piped_lines:
+            yield line, True
+
+        if not interactive_after_pipe:
+            return
+
+        console.print("\n[dim]─── 进入交互模式 (连按两次 Ctrl+C 退出) ───[/dim]\n")
+
+    # 2. 交互式模式 - 复用 app5 的高级实现
+    last_ctrl_c_time = 0
+    hint_text = [" Ctrl+J 换行 | Enter 发送 | 连按两次 Ctrl+C 退出"]
+    result_text = [None]
+    should_exit = [False]
+    history = InMemoryHistory()
+
+    def get_width():
         try:
             return shutil.get_terminal_size().columns
         except Exception:
             return 80
 
-    def _get_separator(self):
-        return "─" * self._get_width()
+    def get_separator():
+        return "─" * get_width()
 
-    def _get_hint_text(self):
-        """获取提示文本，包含待处理任务数"""
-        if self.pending_count > 0:
-            return f" ⏳ {self.pending_count} 个处理中 | Ctrl+J 换行 | Enter 发送 | 连按两次 Ctrl+C 退出"
-        return " Ctrl+J 换行 | Enter 发送 | 连按两次 Ctrl+C 退出"
-
-    async def get_input_async(self) -> str | None:
-        """异步获取用户输入 - 使用 app5 的 Application 布局"""
-        result_text = [None]
-        buffer = Buffer(
-            history=self.history,
-            multiline=True,
-        )
-
-        hint_text = [self._get_hint_text()]
-
-        # 按键绑定
+    while True:
+        buffer = Buffer(history=history, multiline=True)
         kb = KeyBindings()
 
         @kb.add(Keys.ControlJ)
@@ -105,60 +200,63 @@ class AsyncChatUI:
 
         @kb.add(Keys.ControlC)
         def _(event):
+            nonlocal last_ctrl_c_time
             current_time = time.time()
-            if current_time - self.last_ctrl_c_time < 1.0:
-                self.should_exit = True
+            if current_time - last_ctrl_c_time < 1.0:
+                should_exit[0] = True
                 event.app.exit()
             else:
-                self.last_ctrl_c_time = current_time
+                last_ctrl_c_time = current_time
                 hint_text[0] = " ^C (再按一次退出)"
                 event.current_buffer.reset()
                 event.app.invalidate()
 
                 def reset_hint():
-                    hint_text[0] = self._get_hint_text()
-                    if hasattr(event.app, 'invalidate'):
+                    if hint_text[0] == " ^C (再按一次退出)":
+                        hint_text[0] = " Ctrl+J 换行 | Enter 发送 | 连按两次 Ctrl+C 退出"
                         event.app.invalidate()
 
                 event.app.loop.call_later(1.0, reset_hint)
 
         @kb.add(Keys.ControlD)
         def _(event):
-            self.should_exit = True
+            should_exit[0] = True
             event.app.exit()
 
         def get_height():
-            """动态高度"""
             text = buffer.text
-            line_count = text.count('\n') + 1 if text else 1
+            line_count = text.count("\n") + 1 if text else 1
             return Dimension(min=1, max=10, preferred=line_count, weight=1)
 
-        # 创建布局（与 app5 相同）
         layout = Layout(
-            HSplit([
-                Window(
-                    content=FormattedTextControl(lambda: self._get_separator()),
-                    height=1,
-                    style="class:separator",
-                ),
-                Window(
-                    content=BufferControl(buffer=buffer, lexer=SimpleLexer()),
-                    height=get_height,
-                    wrap_lines=True,
-                    left_margins=[],
-                    get_line_prefix=lambda line_no, wrap_count: f"{line_no + 1}> " if wrap_count == 0 else "   ",
-                ),
-                Window(
-                    content=FormattedTextControl(lambda: self._get_separator()),
-                    height=1,
-                    style="class:separator",
-                ),
-                Window(
-                    content=FormattedTextControl(lambda: hint_text[0]),
-                    height=1,
-                    style="class:hint",
-                ),
-            ])
+            HSplit(
+                [
+                    Window(
+                        content=FormattedTextControl(lambda: get_separator()),
+                        height=1,
+                        style="class:separator",
+                    ),
+                    Window(
+                        content=BufferControl(buffer=buffer, lexer=SimpleLexer()),
+                        height=get_height,
+                        wrap_lines=True,
+                        left_margins=[],
+                        get_line_prefix=lambda line_no, wrap_count: f"{line_no + 1}> "
+                        if wrap_count == 0
+                        else "   ",
+                    ),
+                    Window(
+                        content=FormattedTextControl(lambda: get_separator()),
+                        height=1,
+                        style="class:separator",
+                    ),
+                    Window(
+                        content=FormattedTextControl(lambda: hint_text[0]),
+                        height=1,
+                        style="class:hint",
+                    ),
+                ]
+            )
         )
 
         app = Application(
@@ -169,52 +267,18 @@ class AsyncChatUI:
         )
 
         try:
-            await app.run_async()
+            result_text[0] = None
+            app.run()
 
-            if self.should_exit:
-                return None
+            if should_exit[0]:
+                console.print("\n[dim]会话结束[/dim]")
+                break
 
             if result_text[0]:
-                return result_text[0].strip()
-            return None
+                user_input = result_text[0].strip()
+                hint_text[0] = " Ctrl+J 换行 | Enter 发送 | 连按两次 Ctrl+C 退出"
+                if user_input:
+                    yield user_input, False
         except EOFError:
-            self.should_exit = True
-            return None
-
-
-async def get_input_iterator_async(interactive_after_pipe: bool = False):
-    """异步获取输入迭代器"""
-    is_piped = not sys.stdin.isatty()
-
-    if is_piped:
-        piped_lines = [line.strip() for line in sys.stdin.read().splitlines() if line.strip()]
-        for line in piped_lines:
-            yield line, True
-
-        if not interactive_after_pipe:
-            return
-
-        console.print("\n[dim]─── 进入交互模式 (连按两次 Ctrl+C 退出) ───[/dim]\n")
-
-    ui = AsyncChatUI()
-
-    while not ui.should_exit:
-        user_input = await ui.get_input_async()
-        if user_input is None:
-            if ui.should_exit:
-                console.print("\n[dim]会话结束[/dim]")
+            console.print("\n[dim]会话结束[/dim]")
             break
-        yield user_input, False
-
-
-# 同步版本保留兼容性
-def get_input_iterator(interactive_after_pipe: bool = False):
-    """同步版本获取输入"""
-    async def _wrapper():
-        results = []
-        async for item in get_input_iterator_async(interactive_after_pipe):
-            results.append(item)
-        return results
-
-    for item in asyncio.get_event_loop().run_until_complete(_wrapper()):
-        yield item
