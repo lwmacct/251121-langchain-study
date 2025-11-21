@@ -231,18 +231,25 @@ def get_input_iterator(interactive_after_pipe: bool = False):
                 event.current_buffer.reset()
                 event.app.invalidate()
 
+                # 1秒后恢复默认提示
+                def reset_hint():
+                    if hint_text[0] == " ^C (再按一次退出)":
+                        hint_text[0] = " Ctrl+J 换行 | Enter 发送 | 连按两次 Ctrl+C 退出"
+                        event.app.invalidate()
+
+                event.app.loop.call_later(1.0, reset_hint)
+
         @kb.add(Keys.ControlD)
         def _(event):
             should_exit[0] = True
             event.app.exit()
 
         def get_height():
-            """获取 buffer 的动态高度"""
+            """获取 buffer 的动态高度 - 基于实际换行符数量"""
             text = buffer.text
-            if not text:
-                return Dimension(min=1, max=10, preferred=1)
-            line_count = text.count('\n') + 1
-            return Dimension(min=1, max=10, preferred=line_count)
+            # 只计算用户手动添加的换行符，默认单行
+            line_count = text.count('\n') + 1 if text else 1
+            return Dimension(min=1, max=10, preferred=line_count, weight=1)
 
         # 创建布局
         layout = Layout(
