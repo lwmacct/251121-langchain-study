@@ -1,6 +1,6 @@
 [project]
 name = "251121-langchain-study"
-version = "0.0.3"
+version = "0.0.4"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -20,4 +20,5 @@ members = [
     "apps/app3",
     "apps/app4",
     "apps/app5",
+    "apps/app6",
 ]
