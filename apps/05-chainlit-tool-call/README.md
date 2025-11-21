@@ -1,13 +1,30 @@
 # Chainlit Tool Call Demo
 
-A LangGraph + Chainlit agent with tool calling capabilities (time query and calculator).
+A LangGraph + Chainlit agent with **automatic demo mode** - the app automatically sends a preset question when the page loads.
 
 ## Features
 
-- Tool calling: time query and calculator
-- Multimodal support: text and images
-- Visual tool call tracking
-- Detailed debug logging
+- **🎬 Automatic Demo Mode**: Preset question auto-sends on page load
+- **Tool calling**: time query and calculator
+- **Multimodal support**: text and images
+- **Visual tool call tracking**: See tool execution in real-time
+- **Detailed debug logging**: Complete execution traces
+
+## 🎬 Automatic Demo Mode
+
+When you open the app, it will **automatically**:
+
+1. Display welcome message: "🎬 自动演示模式启动"
+2. Auto-send the preset question: **"你觉得人工智能 AGI在多少年后实现, 那时是几几年"**
+3. Process the question through the LangGraph agent
+4. Display the AI's response
+
+This is implemented in the `@cl.on_chat_start` hook, which triggers on page load and programmatically:
+- Creates a `HumanMessage` with the preset content
+- Processes it through the LangGraph workflow
+- Displays all tool calls and the final response
+
+After the demo completes, you can continue chatting normally!
 
 ## How to Verify Tool Calls
 
@@ -65,22 +82,34 @@ Each tool function outputs execution details:
 uv run chainlit run apps/05-chainlit-tool-call/main.py -whd --host 0.0.0.0 --port 8000
 ```
 
+Visit http://localhost:8000 in your browser. The demo will **auto-start immediately**!
+
 ## Test Cases
 
-### Time Query
+### Auto Demo (On Page Load)
+- **Preset question**: "你觉得人工智能 AGI在多少年后实现, 那时是几几年"
+- This runs automatically when you open the app
+
+### After Demo - Continue Chatting
+
+#### Time Query
 - "What time is it now?"
 - "Tell me the current time"
 
-### Math Calculation
+#### Math Calculation
 - "What is 42 times 7?"
 - "Calculate (10 + 5) * 3"
 - "100 divided by 4"
 
-### Multiple Tool Calls
+#### Multimodal (Images)
+- Upload an image (e.g., `apps/05-chainlit-tool-call/img/claude-code.png`)
+- Ask: "请分析这张图片的内容"
+
+#### Multiple Tool Calls
 - "What time is it? Also calculate 100 / 4"
 - "Tell me the time, then calculate 2 ** 10"
 
-### Normal Chat (No Tools)
+#### Normal Chat (No Tools)
 - "Hello"
 - "Tell me about yourself"
 - "What is LangGraph?"

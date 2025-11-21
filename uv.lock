@@ -19,7 +19,7 @@ source = { virtual = "apps/04-chainlit-demo" }
 
 [[package]]
 name = "251121-langchain-study"
-version = "0.0.8"
+version = "0.0.9"
 source = { virtual = "." }
 dependencies = [
     { name = "chainlit" },

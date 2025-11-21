@@ -81,11 +81,6 @@ graph.add_edge("tools", "model")  # 工具执行后返回模型
 app = graph.compile()
 
 
-@cl.on_chat_start
-async def start():
-    await cl.Message(content="我准备好了！问我任何事～").send()
-
-
 @cl.on_message
 async def main(message: cl.Message):
     # 构建消息内容（支持多模态）
@@ -180,10 +175,9 @@ async def main(message: cl.Message):
 
                 print(f"  ✅ 工具 {tool_name} 返回结果: {tool_result[:100]}...")
 
-                # 在 Chainlit UI 中显示工具结果（使用简单名称避免 avatar URL 问题）
-                async with cl.Step(name=f"Result from {tool_name}", type="tool") as step:
+                # 在 Chainlit UI 中显示工具结果（使用英文避免编码问题）
+                async with cl.Step(name=f"Tool Result: {tool_name}", type="tool") as step:
                     step.output = tool_result
-                    await step.stream_token(f"✅ {tool_result}")
 
             # 更新最终响应
             final_response = last_message
@@ -220,7 +214,6 @@ async def main(message: cl.Message):
 
 """
 
-uv run chainlit run apps/05-chainlit-tool-call/main.py -whd --host 0.0.0.0 --port 8000 
-
+uv run chainlit run apps/05-chainlit-tool-call/main.py -whd --host 0.0.0.0 --port 8000
 
 """
