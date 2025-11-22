@@ -67,7 +67,7 @@ requires-dist = [
 
 [[package]]
 name = "251121-langchain-study"
-version = "0.0.17"
+version = "0.0.18"
 source = { virtual = "." }
 dependencies = [
     { name = "chainlit" },
