@@ -173,8 +173,9 @@ async def main(message: cl.Message):
     await handlers.handle_user_message(app, message.content, message.elements)
 
 
-"""
-
-uv run chainlit run apps/05-chainlit-tool-call/main.py -whd --host 0.0.0.0 --port 8000
-
-"""
+if __name__ == "__main__":
+    print("\n" + "=" * 60)
+    print("🚀 启动命令:")
+    print(f"  uv run chainlit run {__file__} -w")
+    print("\n访问地址: http://localhost:8000")
+    print("=" * 60 + "\n")
