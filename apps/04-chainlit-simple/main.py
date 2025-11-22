@@ -11,8 +11,6 @@ from langchain_openai import ChatOpenAI
 
 from m_utils import compress_image_if_needed
 
-# 或者 from langchain_volcengine import ChatVolcEngine 等
-
 api_key = os.getenv("OPENROUTER_API_KEY")
 if not api_key:
     raise RuntimeError("配置错误:未找到环境变量 OPENROUTER_API_KEY")
@@ -133,6 +131,6 @@ async def main(message: cl.Message):
 if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("🚀 启动命令:")
-    print(f"  uv run chainlit run {__file__} -w")
+    print(f"  uv run chainlit run {__file__} -whd --host 0.0.0.0 --port 8000")
     print("\n访问地址: http://localhost:8000")
     print("=" * 60 + "\n")

@@ -9,10 +9,8 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode
 from langchain_openai import ChatOpenAI
 
-
 # app 组件导入
 import handlers
-
 
 # Import tools from shared workspace library
 from m_tools import get_current_time, calculator
@@ -176,6 +174,6 @@ async def main(message: cl.Message):
 if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("🚀 启动命令:")
-    print(f"  uv run chainlit run {__file__} -w")
+    print(f"  uv run chainlit run {__file__} -whd --host 0.0.0.0 --port 8000")
     print("\n访问地址: http://localhost:8000")
     print("=" * 60 + "\n")
