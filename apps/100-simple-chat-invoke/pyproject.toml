@@ -1,5 +1,5 @@
 [project]
-name = "02-simple-chat-stream"
+name = "100-simple-chat-invoke"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"

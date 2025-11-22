@@ -1,5 +1,5 @@
 [project]
-name = "03-simple-langgraph-tui"
+name = "110-simple-langgraph-tui"
 version = "0.1.0"
 description = "TUI tool calling demo using LangGraph and shared tools library"
 readme = "README.md"

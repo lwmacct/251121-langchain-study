@@ -23,3 +23,8 @@
 - 在完成每一个任务后进行 git commit 来提交工作报告, 如果 pre-commit 检查失败, 请继续修改直到通过
 - 环境中可能有多个 AI Agent 在工作，git commit 时不必在意其他被修改的文件
 - 如果你需要跳过检查 (与当前任务不相关的错误)，可以使用 `git commit --no-verify`
+
+## 项目结构
+
+- `apps` 目录下每个文件夹都是一个独立的示例应用, 由 `uv init -app <app-name>` 创建
+- `libs` 目录下包含可复用的库和模块, 由 `uv init -lib <lib-name>` 创建

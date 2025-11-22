@@ -16,6 +16,7 @@ dependencies = [
   "pydantic-settings>=2.12.0",
   "rich>=14.2.0",
   "textual>=6.6.0",
+  "tomlkit>=0.13.3",
 ]
 
 
@@ -23,11 +24,11 @@ dependencies = [
 members = [
   "libs/m-tools",
   "libs/m-utils",
-  "apps/01-simple-chat-invoke",
-  "apps/02-simple-chat-stream",
-  "apps/03-simple-langgraph-tui",
-  "apps/04-chainlit-simple",
-  "apps/05-chainlit-tool-call",
+  "apps/100-simple-chat-invoke",
+  "apps/101-simple-chat-stream",
+  "apps/110-simple-langgraph-tui",
+  "apps/120-chainlit-demo",
+  "apps/130-streamlit-demo",
 ]
 
 [tool.uv.sources]

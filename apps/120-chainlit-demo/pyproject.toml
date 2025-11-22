@@ -1,5 +1,5 @@
 [project]
-name = "05-chainlit-tool-call"
+name = "120-chainlit-demo"
 version = "0.1.0"
 description = "Chainlit tool calling demo using LangGraph and shared tools library"
 readme = "README.md"
