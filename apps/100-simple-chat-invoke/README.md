@@ -1,0 +1,1 @@
+../../docs/links/100-simple-chat-invoke.md
