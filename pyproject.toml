@@ -1,6 +1,6 @@
 [project]
 name = "251121-langchain-study"
-version = "0.0.15"
+version = "0.0.16"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -9,6 +9,8 @@ dependencies = [
   "langchain-anthropic>=1.1.0",
   "langchain-openai>=1.0.3",
   "langgraph>=1.0.3",
+  "m-tools",
+  "m-utils",
   "pillow>=12.0.0",
   "prompt-toolkit>=3.0.52",
   "pydantic-settings>=2.12.0",
@@ -16,17 +18,18 @@ dependencies = [
   "textual>=6.6.0",
 ]
 
+
 [tool.uv.workspace]
 members = [
-  "libs/tools",
-  "apps/01-one-simple-chat-invoke",
-  "apps/02-one-simple-chat-stream",
-  "apps/03-interactive-chat-trich",
-  "apps/04-chainlit-demo",
+  "libs/m_tools",
+  "libs/m_utils",
+  "apps/01-simple-chat-invoke",
+  "apps/02-simple-chat-stream",
+  "apps/03-simple-langgraph-tui",
+  "apps/04-chainlit-simple",
   "apps/05-chainlit-tool-call",
-  "apps/06-tui-tool-call",
 ]
 
-
-[tool.black]
-line-length = 128
+[tool.uv.sources]
+m-tools = { workspace = true }
+m-utils = { workspace = true }

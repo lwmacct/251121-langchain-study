@@ -27,7 +27,7 @@ from rich.prompt import Prompt
 from rich import box
 
 # Import tools from shared workspace library
-from tools import get_current_time, calculator
+from m_tools import get_current_time, calculator
 
 # ===== 初始化 =====
 console = Console()

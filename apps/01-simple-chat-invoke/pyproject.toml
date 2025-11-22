@@ -1,5 +1,5 @@
 [project]
-name = "04-chainlit-demo"
+name = "01-simple-chat-invoke"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"

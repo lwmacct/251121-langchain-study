@@ -9,7 +9,7 @@ from langchain_core.messages import AnyMessage, HumanMessage
 from langgraph.graph import StateGraph, START, END
 from langchain_openai import ChatOpenAI
 
-from utils import compress_image_if_needed
+from m_utils import compress_image_if_needed
 
 # 或者 from langchain_volcengine import ChatVolcEngine 等
 

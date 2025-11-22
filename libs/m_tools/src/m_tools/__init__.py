@@ -16,7 +16,7 @@ Usage:
     llm_with_tools = llm.bind_tools([get_current_time, calculator])
 """
 
-from tools.common import get_current_time, calculator
+from .common import get_current_time, calculator
 
 __all__ = ["get_current_time", "calculator"]
 __version__ = "0.1.0"

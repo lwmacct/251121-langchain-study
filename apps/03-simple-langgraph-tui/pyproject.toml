@@ -1,10 +1,10 @@
 [project]
-name = "06-tui-tool-call"
+name = "03-simple-langgraph-tui"
 version = "0.1.0"
 description = "TUI tool calling demo using LangGraph and shared tools library"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["tools"]
+dependencies = ["m_tools"]
 
 [tool.uv.sources]
-tools = { workspace = true }
+m_tools = { workspace = true }

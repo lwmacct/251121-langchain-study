@@ -1,8 +1,10 @@
 [project]
-name = "interactive-chat-trich"
+name = "04-chainlit-simple"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["m_utils"]
 
+[tool.uv.sources]
+m_utils = { workspace = true }

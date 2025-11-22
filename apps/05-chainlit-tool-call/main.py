@@ -14,7 +14,7 @@ from langchain_openai import ChatOpenAI
 import handlers
 
 # Import tools from shared workspace library
-from tools import get_current_time, calculator
+from m_tools import get_current_time, calculator
 
 
 # 或者 from langchain_volcengine import ChatVolcEngine 等
