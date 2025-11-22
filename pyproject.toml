@@ -1,6 +1,6 @@
 [project]
 name = "251121-langchain-study"
-version = "0.0.13"
+version = "0.0.14"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -18,11 +18,11 @@ dependencies = [
 
 [tool.uv.workspace]
 members = [
+  "libs/tools",
   "apps/01-one-simple-chat-invoke",
   "apps/02-one-simple-chat-stream",
   "apps/03-interactive-chat-trich",
   "apps/04-chainlit-demo",
   "apps/05-chainlit-tool-call",
   "apps/06-tui-tool-call",
-  "libs/tools",
 ]
