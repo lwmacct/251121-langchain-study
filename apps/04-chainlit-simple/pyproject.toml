@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["m_utils"]
+dependencies = ["m-utils"]
 
 [tool.uv.sources]
-m_utils = { workspace = true }
+m-utils = { workspace = true }

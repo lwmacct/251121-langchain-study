@@ -4,4 +4,8 @@ version = "0.1.0"
 description = "Chainlit tool calling demo using LangGraph and shared tools library"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["m_tools", "m_utils"]
+dependencies = ["m-tools", "m-utils"]
+
+[tool.uv.sources]
+m-tools = { workspace = true }
+m-utils = { workspace = true }
