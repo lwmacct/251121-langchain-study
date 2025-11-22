@@ -25,12 +25,9 @@ def get_current_time() -> str:
 
     # 判断上午/下午
     hour = beijing.hour
-    period = "上午" if 5 <= hour < 12 else "下午" if 12 <= hour < 18 else "晚上"
+    period = "上午" if 5 <= hour < 12 else ("下午" if 12 <= hour < 18 else "晚上")
 
-    return (
-        f"UTC: {utc_now.strftime('%H:%M:%S')} | "
-        f"北京时间: {beijing.strftime('%H:%M:%S')} ({period})"
-    )
+    return f"UTC: {utc_now.strftime('%H:%M:%S')} | " f"北京时间: {beijing.strftime('%H:%M:%S')} ({period})"
 
 
 @tool

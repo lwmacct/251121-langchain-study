@@ -5,12 +5,7 @@ import io
 from PIL import Image
 
 
-def compress_image_if_needed(
-    image_path: str,
-    max_size_mb: float = 5.0,
-    max_dimension: int = 1568,
-    quality: int = 85,
-) -> bytes:
+def compress_image_if_needed(image_path: str, max_size_mb: float = 5.0, max_dimension: int = 1568, quality: int = 85) -> bytes:
     """
     智能图片压缩：仅在必要时处理
 
@@ -33,7 +28,7 @@ def compress_image_if_needed(
 
     # 打开图片检查尺寸
     img = Image.open(image_path)
-    width, height = img.size
+    (width, height) = img.size
     max_current_dimension = max(width, height)
 
     # 判断是否需要处理
@@ -55,7 +50,7 @@ def compress_image_if_needed(
         if img.mode == "P":
             img = img.convert("RGBA")
         # 使用 alpha 通道作为 mask（如果存在）
-        background.paste(img, mask=img.split()[-1] if img.mode in ("RGBA", "LA") else None)
+        background.paste(img, mask=(img.split()[-1] if img.mode in ("RGBA", "LA") else None))
         img = background
 
     # 缩放图片（保持宽高比）
@@ -68,7 +63,7 @@ def compress_image_if_needed(
     compressed_data = output.getvalue()
 
     compressed_size_mb = len(compressed_data) / (1024 * 1024)
-    new_width, new_height = img.size
+    (new_width, new_height) = img.size
     print(f"✓ 压缩完成: {compressed_size_mb:.2f}MB ({new_width}×{new_height}px)")
 
     return compressed_data

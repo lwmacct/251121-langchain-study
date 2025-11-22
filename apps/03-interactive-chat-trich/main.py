@@ -51,17 +51,8 @@ def parse_args():
   echo "2 + 3 * 4" | python -m apps.app6 -i   # 管道 + 交互模式
         """,
     )
-    parser.add_argument(
-        "-i",
-        "--interactive",
-        action="store_true",
-        help="管道结束后进入交互模式",
-    )
-    parser.add_argument(
-        "--simple",
-        action="store_true",
-        help="使用简化输入模式（不使用 prompt_toolkit）",
-    )
+    parser.add_argument("-i", "--interactive", action="store_true", help="管道结束后进入交互模式")
+    parser.add_argument("--simple", action="store_true", help="使用简化输入模式（不使用 prompt_toolkit）")
     return parser.parse_args()
 
 
@@ -81,9 +72,7 @@ def main():
     if args.simple or not ADVANCED_UI_AVAILABLE:
         input_iterator = get_input_iterator(interactive_after_pipe=args.interactive)
     else:
-        input_iterator = get_advanced_input_iterator(
-            interactive_after_pipe=args.interactive
-        )
+        input_iterator = get_advanced_input_iterator(interactive_after_pipe=args.interactive)
 
     # 主循环 - 简洁统一的处理流程
     try:
@@ -97,7 +86,7 @@ def main():
 
             # 3. 调用 Agent - 统一入口，自动处理工具调用
             try:
-                reply, tool_calls = agent.chat(user_input, session.get_history()[:-1])
+                (reply, tool_calls) = agent.chat(user_input, session.get_history()[:-1])
 
                 # 4. 添加回复到历史
                 session.add_assistant_message(reply)

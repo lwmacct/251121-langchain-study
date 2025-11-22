@@ -71,14 +71,7 @@ graph.add_node("tools", tool_node)
 
 # 添加边
 graph.add_edge(START, "model")
-graph.add_conditional_edges(
-    "model",
-    should_continue,
-    {
-        "tools": "tools",
-        END: END,
-    },
-)
+graph.add_conditional_edges("model", should_continue, {"tools": "tools", END: END})
 graph.add_edge("tools", "model")  # 工具执行后返回模型
 
 # 编译图
@@ -87,11 +80,36 @@ app = graph.compile()
 
 # ===== 预设问题配置 =====
 PRESET_QUESTIONS = [
-    {"name": "time_query", "label": "⏰ 查询当前时间", "question": "现在几点了？请告诉我当前的时间。", "description": "触发 get_current_time 工具"},
-    {"name": "math_calc", "label": "🔢 数学计算", "question": "请帮我计算 42 * 7 等于多少？", "description": "触发 calculator 工具"},
-    {"name": "multi_tool", "label": "🔧 多工具组合", "question": "现在几点了？另外帮我算一下 100 除以 4 等于多少。", "description": "同时触发多个工具"},
-    {"name": "agi_question", "label": "🤖 AGI 预测", "question": "你觉得人工智能 AGI 在多少年后实现，那时是几几年？", "description": "时间查询 + 推理"},
-    {"name": "normal_chat", "label": "💬 普通对话", "question": "你好！请介绍一下你自己和你的能力。", "description": "不触发工具"},
+    {
+        "name": "time_query",
+        "label": "⏰ 查询当前时间",
+        "question": "现在几点了？请告诉我当前的时间。",
+        "description": "触发 get_current_time 工具",
+    },
+    {
+        "name": "math_calc",
+        "label": "🔢 数学计算",
+        "question": "请帮我计算 42 * 7 等于多少？",
+        "description": "触发 calculator 工具",
+    },
+    {
+        "name": "multi_tool",
+        "label": "🔧 多工具组合",
+        "question": "现在几点了？另外帮我算一下 100 除以 4 等于多少。",
+        "description": "同时触发多个工具",
+    },
+    {
+        "name": "agi_question",
+        "label": "🤖 AGI 预测",
+        "question": "你觉得人工智能 AGI 在多少年后实现，那时是几几年？",
+        "description": "时间查询 + 推理",
+    },
+    {
+        "name": "normal_chat",
+        "label": "💬 普通对话",
+        "question": "你好！请介绍一下你自己和你的能力。",
+        "description": "不触发工具",
+    },
 ]
 
 
@@ -123,22 +141,14 @@ async def on_chat_start():
 
     # 构建 Action 列表
     actions = [
-        cl.Action(
-            name=q["name"],
-            payload={"question": q["question"]},
-            label=q["label"],
-            description=q["description"],
-        )
+        cl.Action(name=q["name"], payload={"question": q["question"]}, label=q["label"], description=q["description"])
         for q in PRESET_QUESTIONS
     ]
 
     # 询问用户选择
     res = await cl.AskActionMessage(
-        content="**🎬 选择一个预设问题开始：**",
-        actions=actions,
-        timeout=300,  # 5 分钟超时
-        raise_on_timeout=False,
-    ).send()
+        content="**🎬 选择一个预设问题开始：**", actions=actions, timeout=300, raise_on_timeout=False
+    ).send()  # 5 分钟超时
 
     # 处理用户选择
     if res and res.get("payload"):

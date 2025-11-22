@@ -84,9 +84,7 @@ class Session:
                 assistant_msg = None
 
                 # 查找下一条助手消息
-                if i + 1 < len(self.history) and isinstance(
-                    self.history[i + 1], AIMessage
-                ):
+                if i + 1 < len(self.history) and isinstance(self.history[i + 1], AIMessage):
                     assistant_msg = self.history[i + 1]
                     i += 2
                 else:

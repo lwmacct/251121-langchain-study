@@ -71,9 +71,7 @@ def get_input_iterator(interactive_after_pipe: bool = False) -> Iterator[tuple[s
 
     # 1. 处理管道输入
     if is_piped:
-        piped_lines = [
-            line.strip() for line in sys.stdin.read().splitlines() if line.strip()
-        ]
+        piped_lines = [line.strip() for line in sys.stdin.read().splitlines() if line.strip()]
         for line in piped_lines:
             # 跳过退出命令（管道模式下不需要）
             if line.lower() in ["quit", "exit", "退出", "结束", "q"]:
@@ -119,14 +117,7 @@ try:
     from prompt_toolkit.history import InMemoryHistory
     from prompt_toolkit.key_binding import KeyBindings
     from prompt_toolkit.keys import Keys
-    from prompt_toolkit.layout import (
-        Layout,
-        HSplit,
-        Window,
-        FormattedTextControl,
-        BufferControl,
-        Dimension,
-    )
+    from prompt_toolkit.layout import Layout, HSplit, Window, FormattedTextControl, BufferControl, Dimension
     from prompt_toolkit.lexers import SimpleLexer
     import time
     import shutil
@@ -136,9 +127,7 @@ except ImportError:
     ADVANCED_UI_AVAILABLE = False
 
 
-def get_advanced_input_iterator(
-    interactive_after_pipe: bool = False,
-) -> Iterator[tuple[str, bool]]:
+def get_advanced_input_iterator(interactive_after_pipe: bool = False) -> Iterator[tuple[str, bool]]:
     """获取输入迭代器 - 高级版本（使用 prompt_toolkit）
 
     提供多行输入、历史记录、更好的编辑体验
@@ -151,9 +140,7 @@ def get_advanced_input_iterator(
     """
     if not ADVANCED_UI_AVAILABLE:
         # 降级到简单版本
-        console.print(
-            "[yellow]警告: prompt_toolkit 未安装，使用简化输入模式[/yellow]"
-        )
+        console.print("[yellow]警告: prompt_toolkit 未安装，使用简化输入模式[/yellow]")
         yield from get_input_iterator(interactive_after_pipe)
         return
 
@@ -161,9 +148,7 @@ def get_advanced_input_iterator(
 
     # 1. 处理管道输入
     if is_piped:
-        piped_lines = [
-            line.strip() for line in sys.stdin.read().splitlines() if line.strip()
-        ]
+        piped_lines = [line.strip() for line in sys.stdin.read().splitlines() if line.strip()]
         for line in piped_lines:
             # 跳过退出命令（管道模式下不需要）
             if line.lower() in ["quit", "exit", "退出", "结束", "q"]:
@@ -239,40 +224,21 @@ def get_advanced_input_iterator(
         layout = Layout(
             HSplit(
                 [
-                    Window(
-                        content=FormattedTextControl(lambda: get_separator()),
-                        height=1,
-                        style="class:separator",
-                    ),
+                    Window(content=FormattedTextControl(lambda: get_separator()), height=1, style="class:separator"),
                     Window(
                         content=BufferControl(buffer=buffer, lexer=SimpleLexer()),
                         height=get_height,
                         wrap_lines=True,
                         left_margins=[],
-                        get_line_prefix=lambda line_no, wrap_count: f"{line_no + 1}> "
-                        if wrap_count == 0
-                        else "   ",
+                        get_line_prefix=lambda line_no, wrap_count: (f"{line_no + 1}> " if wrap_count == 0 else "   "),
                     ),
-                    Window(
-                        content=FormattedTextControl(lambda: get_separator()),
-                        height=1,
-                        style="class:separator",
-                    ),
-                    Window(
-                        content=FormattedTextControl(lambda: hint_text[0]),
-                        height=1,
-                        style="class:hint",
-                    ),
+                    Window(content=FormattedTextControl(lambda: get_separator()), height=1, style="class:separator"),
+                    Window(content=FormattedTextControl(lambda: hint_text[0]), height=1, style="class:hint"),
                 ]
             )
         )
 
-        app = Application(
-            layout=layout,
-            key_bindings=kb,
-            full_screen=False,
-            mouse_support=False,
-        )
+        app = Application(layout=layout, key_bindings=kb, full_screen=False, mouse_support=False)
 
         try:
             result_text[0] = None

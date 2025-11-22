@@ -1,6 +1,6 @@
 [project]
 name = "251121-langchain-study"
-version = "0.0.14"
+version = "0.0.15"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -26,3 +26,7 @@ members = [
   "apps/05-chainlit-tool-call",
   "apps/06-tui-tool-call",
 ]
+
+
+[tool.black]
+line-length = 128

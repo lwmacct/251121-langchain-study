@@ -47,11 +47,8 @@ async def handle_user_message(app, content_text: str, image_elements: Optional[L
             # 智能压缩图片（仅在必要时）并转换为 base64
             try:
                 compressed_image = utils.compress_image_if_needed(
-                    image.path,
-                    max_size_mb=5.0,  # Claude API 限制 5MB
-                    max_dimension=1568,  # Claude 推荐 1568px
-                    quality=85,  # 业界标准
-                )
+                    image.path, max_size_mb=5.0, max_dimension=1568, quality=85
+                )  # Claude API 限制 5MB  # Claude 推荐 1568px  # 业界标准
                 image_data = base64.b64encode(compressed_image).decode("utf-8")
 
                 # 打印调试信息

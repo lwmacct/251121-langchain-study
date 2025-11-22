@@ -86,14 +86,7 @@ graph.add_node("tools", tool_node)
 
 # 添加边
 graph.add_edge(START, "model")
-graph.add_conditional_edges(
-    "model",
-    should_continue,
-    {
-        "tools": "tools",
-        END: END,
-    },
-)
+graph.add_conditional_edges("model", should_continue, {"tools": "tools", END: END})
 graph.add_edge("tools", "model")  # 工具执行后返回模型
 
 # 编译图

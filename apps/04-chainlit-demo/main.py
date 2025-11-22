@@ -63,7 +63,9 @@ async def main(message: cl.Message):
         for image in images:
             # 智能压缩图片（仅在必要时）并转换为 base64
             try:
-                compressed_image = compress_image_if_needed(image.path, max_size_mb=5.0, max_dimension=1568, quality=85)  # Claude API 限制 5MB  # Claude 推荐 1568px  # 业界标准
+                compressed_image = compress_image_if_needed(
+                    image.path, max_size_mb=5.0, max_dimension=1568, quality=85
+                )  # Claude API 限制 5MB  # Claude 推荐 1568px  # 业界标准
                 image_data = base64.b64encode(compressed_image).decode("utf-8")
 
                 # 打印调试信息
@@ -71,7 +73,13 @@ async def main(message: cl.Message):
                 print(f"Base64 长度: {len(image_data)} (原始文件: {os.path.getsize(image.path)} bytes)")
 
                 # 添加图片内容块（统一使用 JPEG MIME 类型）
-                content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}})
+                content.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{image_data}"},
+                    }
+                )
+
             except Exception as e:
                 print(f"图片处理失败: {e}")
                 await cl.Message(content=f"图片处理失败: {e}").send()

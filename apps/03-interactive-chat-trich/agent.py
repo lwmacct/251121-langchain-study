@@ -95,10 +95,10 @@ class Agent:
                         if invalid_tc.get("args") is None:
                             fixed_tc = {
                                 "name": invalid_tc["name"],
-                                "args": {},  # 空参数
+                                "args": {},
                                 "id": invalid_tc["id"],
                                 "type": invalid_tc.get("type", "function"),
-                            }
+                            }  # 空参数
                             all_tool_calls.append(fixed_tc)
                             if config.debug:
                                 console.print(f"[dim yellow]⚠️  修复无参数工具调用: {invalid_tc['name']}[/dim yellow]")
@@ -110,16 +110,12 @@ class Agent:
                 # 检查是否有工具调用
                 if not all_tool_calls:
                     # 没有工具调用，直接返回 LLM 的回复
-                    return response.content, tool_calls_made if tool_calls_made else None
+                    return (response.content, (tool_calls_made if tool_calls_made else None))
 
                 # 处理工具调用
                 # 创建一个清理过的 AIMessage，只包含有效的 tool_calls
                 # 避免将 invalid_tool_calls 传递给后续的 API 调用
-                clean_response = AIMessage(
-                    content=response.content,
-                    tool_calls=all_tool_calls,
-                    id=response.id,
-                )
+                clean_response = AIMessage(content=response.content, tool_calls=all_tool_calls, id=response.id)
                 messages.append(clean_response)
 
                 for tool_call in all_tool_calls:
@@ -141,41 +137,23 @@ class Agent:
                                 console.print(f"[dim cyan]← 工具结果: {result}[/dim cyan]")
 
                             # 添加工具执行结果
-                            messages.append(
-                                ToolMessage(
-                                    content=str(result),
-                                    tool_call_id=tool_id,
-                                    name=tool_name,
-                                )
-                            )
+                            messages.append(ToolMessage(content=str(result), tool_call_id=tool_id, name=tool_name))
                         except Exception as e:
                             error_msg = f"工具执行错误：{e}"
                             console.print(f"[red]{error_msg}[/red]")
-                            messages.append(
-                                ToolMessage(
-                                    content=error_msg,
-                                    tool_call_id=tool_id,
-                                    name=tool_name,
-                                )
-                            )
+                            messages.append(ToolMessage(content=error_msg, tool_call_id=tool_id, name=tool_name))
                     else:
                         error_msg = f"未知工具：{tool_name}"
-                        messages.append(
-                            ToolMessage(
-                                content=error_msg,
-                                tool_call_id=tool_id,
-                                name=tool_name,
-                            )
-                        )
+                        messages.append(ToolMessage(content=error_msg, tool_call_id=tool_id, name=tool_name))
 
                 # 继续循环，让 LLM 基于工具结果生成最终回复
 
             except Exception as e:
                 console.print(f"[red]Agent 错误：{e}[/red]")
-                return f"抱歉，处理请求时出错：{e}", None
+                return (f"抱歉，处理请求时出错：{e}", None)
 
         # 达到最大迭代次数
-        return "抱歉，工具调用次数过多，请简化您的问题。", tool_calls_made
+        return ("抱歉，工具调用次数过多，请简化您的问题。", tool_calls_made)
 
 
 def create_agent() -> Agent:
