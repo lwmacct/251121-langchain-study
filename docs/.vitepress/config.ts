@@ -15,7 +15,6 @@ export default defineConfig({
     nav: [
       { text: "Home", link: "/" },
       { text: "Examples", link: "/markdown-examples" },
-      { text: "Apps", link: "/links/100-simple-chat-invoke" },
     ],
 
     sidebar: [
@@ -29,11 +28,20 @@ export default defineConfig({
       {
         text: "应用示例",
         items: [
-          { text: "100 Simple Chat Invoke", link: "/links/100-simple-chat-invoke" },
-          { text: "101 Simple Chat Stream", link: "/links/101-simple-chat-stream" },
-          { text: "110 Simple LangGraph TUI", link: "/links/110-simple-langgraph-tui" },
-          { text: "120 Chainlit Demo", link: "/links/120-chainlit-demo" },
-          { text: "130 Streamlit Demo", link: "/links/130-streamlit-demo" },
+          {
+            text: "100 Simple Chat Invoke",
+            link: "/readme/100-simple-chat-invoke",
+          },
+          {
+            text: "101 Simple Chat Stream",
+            link: "/readme/101-simple-chat-stream",
+          },
+          {
+            text: "110 Simple LangGraph TUI",
+            link: "/readme/110-simple-langgraph-tui",
+          },
+          { text: "120 Chainlit Demo", link: "/readme/120-chainlit-demo" },
+          { text: "130 Streamlit Demo", link: "/readme/130-streamlit-demo" },
         ],
       },
     ],
