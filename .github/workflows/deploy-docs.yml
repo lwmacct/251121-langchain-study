@@ -14,7 +14,7 @@ on:
   # 允许手动触发
   workflow_dispatch:
 
-# 设置 GitHub Pages 部署所需的权限
+# 设置 GitHub Pages 部署所需的权限.
 permissions:
   contents: read
   pages: write
