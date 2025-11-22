@@ -14,7 +14,7 @@
 ## 📚 项目文档
 
 - 本项目使用 VitePress 进行文档编写和展示, 文档源码位于 `docs/` 目录下
-- 文件 `docs/.vitepress/config.ts` 是 VitePress 包含所有的配置
+- 文件 `docs/.vitepress/config.ts` 包含所有的配置
 - 在任务完成后需要更同步更新 VitePress 文档
 
 ## 📝 Git 提交约定
