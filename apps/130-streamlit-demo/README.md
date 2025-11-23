@@ -1,1 +1,1 @@
-../../docs/links/130-streamlit-demo.md
+../../docs/readme/130-streamlit-demo.md
