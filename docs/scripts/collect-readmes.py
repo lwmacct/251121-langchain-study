@@ -14,6 +14,7 @@ import os
 import re
 import json
 import subprocess
+import shutil
 from pathlib import Path
 
 
@@ -122,6 +123,13 @@ def main():
 
     # 确定输出目录
     output_dir = project_root / 'docs' / 'readme'
+
+    # 清空输出目录（删除所有旧文件，避免残留）
+    if output_dir.exists():
+        print(f"🗑️  清空输出目录: {output_dir.relative_to(project_root)}\n")
+        shutil.rmtree(output_dir)
+
+    # 重新创建输出目录
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # 扫描目标目录
