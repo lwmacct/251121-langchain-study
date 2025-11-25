@@ -23,18 +23,5 @@
         "link": "/readme/apps~130-streamlit-demo"
       }
     ]
-  },
-  {
-    "text": "库模块",
-    "items": [
-      {
-        "text": "Untitled",
-        "link": "/readme/libs~m-tools"
-      },
-      {
-        "text": "Untitled",
-        "link": "/readme/libs~m-utils"
-      }
-    ]
   }
 ]

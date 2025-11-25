@@ -156,6 +156,17 @@ def main():
                 content = readme_path.read_text(encoding='utf-8')
                 title = extract_title(content)
 
+                # 验证：跳过空文件或没有有效标题的文件
+                if not content.strip():
+                    rel_path = readme_path.parent.relative_to(project_root)
+                    print(f"⊘ {rel_path} -> 跳过（文件为空）")
+                    continue
+
+                if title == "Untitled":
+                    rel_path = readme_path.parent.relative_to(project_root)
+                    print(f"⊘ {rel_path} -> 跳过（没有找到标题）")
+                    continue
+
                 # 计算相对路径和输出文件名
                 rel_path = readme_path.parent.relative_to(project_root)
                 output_name = str(rel_path).replace('/', '~') + '.md'
