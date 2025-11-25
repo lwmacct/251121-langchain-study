@@ -22,10 +22,19 @@ repos:
         stages: [pre-commit]
         files: \.go$
 
+      # 收集 README 文件到文档目录
+      - id: collect-readmes
+        name: Collect README.md files to docs/readme/
+        entry: docs/scripts/collect-readmes.py
+        language: script
+        pass_filenames: false
+        stages: [pre-commit]
+        files: README\.md$
+
       # VitePress 文档构建检查
       - id: vitepress-build
         name: Build VitePress docs when docs/ changes
-        entry: docs/.vitepress/scripts/vitepress-build-pre-commit.sh
+        entry: docs/scripts/vitepress-build-pre-commit.sh
         language: script
         pass_filenames: true
         stages: [pre-commit]

@@ -1,3 +1,7 @@
+---
+title: 100-simple-chat-invoke
+---
+
 # 100-simple-chat-invoke
 
 简单的 LangChain 聊天调用示例，演示如何使用 `invoke` 方法进行一次性 LLM 对话。

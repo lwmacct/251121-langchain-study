@@ -1,53 +1,33 @@
 import { defineConfig } from "vitepress";
+import readmeSidebar from "../readme/readme-sidebar.json";
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
-  title: "My Awesome Project",
-  description: "A VitePress Site",
+  title: "LangChain Study",
+  description: "LangChain 学习项目文档",
   base: process.env.BASE || "/docs",
   ignoreDeadLinks: [
-    // 忽略本地开发链接
+    // 忽略所有 localhost 链接(开发环境链接)
     /^https?:\/\/localhost/,
+    // 忽略所有 127.0.0.1 链接
     /^https?:\/\/127\.0\.0\.1/,
   ],
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
     nav: [
-      { text: "Home", link: "/" },
-      { text: "Examples", link: "/markdown-examples" },
+      { text: "首页", link: "/" },
+      { text: "Agents", link: "/agents" },
     ],
 
     sidebar: [
       {
-        text: "Examples",
-        items: [
-          { text: "Markdown Examples", link: "/markdown-examples" },
-          { text: "Runtime API Examples", link: "/api-examples" },
-        ],
+        text: "指南",
+        items: [{ text: "Agents", link: "/agents" }],
       },
-      {
-        text: "应用示例",
-        items: [
-          {
-            text: "100 Simple Chat Invoke",
-            link: "/readme/100-simple-chat-invoke",
-          },
-          {
-            text: "101 Simple Chat Stream",
-            link: "/readme/101-simple-chat-stream",
-          },
-          {
-            text: "110 Simple LangGraph TUI",
-            link: "/readme/110-simple-langgraph-tui",
-          },
-          { text: "120 Chainlit Demo", link: "/readme/120-chainlit-demo" },
-          { text: "130 Streamlit Demo", link: "/readme/130-streamlit-demo" },
-        ],
-      },
+      // 动态导入的 README 部分（由 scripts/collect-readmes.py 生成）
+      ...readmeSidebar,
     ],
 
-    socialLinks: [
-      { icon: "github", link: "https://github.com/vuejs/vitepress" },
-    ],
+    socialLinks: [{ icon: "github", link: "https://github.com/yourusername/langchain-study" }],
   },
 });

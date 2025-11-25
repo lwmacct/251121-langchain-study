@@ -1,4 +1,9 @@
-# app.py
+#!/usr/bin/env -S uv run python
+"""
+Chainlit Web 应用演示 - LangGraph 工具调用与多模态支持
+
+演示如何使用 Chainlit 构建 Web 界面的 AI 应用，支持工具调用、实时追踪和图片分析
+"""
 import operator
 import os
 from typing import Annotated, Sequence, TypedDict

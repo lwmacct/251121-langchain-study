@@ -1,3 +1,9 @@
+#!/usr/bin/env -S uv run python
+"""
+LangChain 流式输出演示 - 使用 stream 方法进行实时流式对话
+
+演示 LangChain 的流式响应功能，逐字输出 LLM 响应内容
+"""
 import os
 
 from langchain_openai import ChatOpenAI

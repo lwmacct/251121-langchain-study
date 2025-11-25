@@ -1,3 +1,7 @@
+---
+title: 101-simple-chat-stream
+---
+
 # 101-simple-chat-stream
 
 简单的 LangChain 聊天流式输出示例，演示如何使用 `stream` 方法实现实时流式响应。

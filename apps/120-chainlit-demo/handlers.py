@@ -1,7 +1,8 @@
+#!/usr/bin/env -S uv run python
 """
-Chainlit 消息处理器
-==================
-包含所有用户消息处理的核心业务逻辑，与 LangGraph agent 集成。
+Chainlit 消息处理器模块
+
+提供用户消息处理的核心业务逻辑，与 LangGraph agent 集成，支持多模态消息处理
 """
 
 import os

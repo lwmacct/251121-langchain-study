@@ -1,3 +1,7 @@
+---
+title: Get Started Quickly
+---
+
 # Get Started Quickly
 
 ```shell

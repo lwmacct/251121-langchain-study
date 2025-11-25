@@ -8,6 +8,7 @@
 ## 🔨 开发环境
 
 - 所有 Python 相关指令必须通过 `uv` 执行, 这是正确使用 Python 环境的唯一方式
+  - Python 脚本首行必须使用 `#!/usr/bin/env -S uv run python` 来确保使用正确的环境
   - 如果需要安装包, 请使用 `uv add <package-name>`
   - 如果需要运行 Python 包命令或脚本, 请使用 `uv run <command-name>`, 例如: `uv run pip list`, `uv run apps/<app_name>/main.py`
 

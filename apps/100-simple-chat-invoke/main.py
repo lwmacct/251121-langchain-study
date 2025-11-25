@@ -1,3 +1,9 @@
+#!/usr/bin/env -S uv run python
+"""
+LangChain 基础调用演示 - 使用 invoke 方法进行 LLM 对话
+
+演示 LangChain 最基本的 LLM 调用方式（同步、非流式）
+"""
 import os
 
 from langchain_openai import ChatOpenAI

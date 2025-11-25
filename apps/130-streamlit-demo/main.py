@@ -1,7 +1,8 @@
+#!/usr/bin/env -S uv run python
 """
-Streamlit + LangGraph 工具调用演示
-====================================
-展示如何在 Streamlit 中集成 LangGraph 和工具调用功能
+Streamlit Web 应用演示 - LangGraph 工具调用与实时追踪
+
+演示如何使用 Streamlit 构建 Web 界面的 AI 应用，支持工具调用和实时状态追踪
 """
 
 import os

@@ -1,1 +1,5 @@
-../../docs/readme/130-streamlit-demo.md
+# Get Started Quickly
+
+```shell
+uv run streamlit run apps/06-streamlit-demo/main.py
+```

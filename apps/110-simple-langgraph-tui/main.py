@@ -1,16 +1,10 @@
+#!/usr/bin/env -S uv run python
 """
-TUI 工具调用演示 - 简洁版本
+LangGraph TUI 工具调用演示 - 使用 Rich 库的终端交互界面
 
-参考 05-chainlit-tool-call 的简单架构：
-- 使用 LangGraph 的 StateGraph + ToolNode
-- 使用 bind_tools 让 LLM 自动决定工具调用
-- 使用 rich 库实现终端界面
-
-演示场景：
-- "现在几点" -> LLM 自动调用 get_current_time 工具
-- "2 + 3 * 4" -> LLM 自动调用 calculator 工具
-- "你好" -> LLM 直接回答，无需工具
+演示 LangGraph 工具调用功能，包括时间查询、计算器等工具，并通过 Rich 库提供友好的终端界面
 """
+
 
 import operator
 import os
@@ -106,6 +100,7 @@ def print_welcome():
 - 现在几点了？
 - 帮我计算 42 * 7
 - 你好，介绍一下你自己
+- 你预测人工智能 agi 在哪一年能实现, 那时候 是几几年了, 你来计算一下
 
 输入 `exit` 或 `quit` 退出
 """
@@ -192,15 +187,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-"""
-运行方式：
-
-uv run python apps/06-tui-tool-call/main.py
-
-或者：
-
-cd apps/06-tui-tool-call
-uv run python main.py
-"""
